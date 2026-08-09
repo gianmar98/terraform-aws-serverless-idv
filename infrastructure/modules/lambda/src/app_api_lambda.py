@@ -81,9 +81,16 @@ def lambda_handler(event, context):
 
             # "pending" covers both no-row-yet and row-without-all-results. WriteToDynamo
             # creates the row long before the flags land, so keying "done" off the row's
-            # existence would stop the browser polling on a half-finished run. The frontend
-            # only distinguishes keep-polling from stop (lib/types.ts StatusResponse), so
-            # there is no third state to report.
+            # existence would stop the browser polling on a half-finished run.
+            #
+            # A FALSE flag is terminal, though: compare_faces and compare_details both raise
+            # on a mismatch, which fails the state machine, so the remaining flags will never
+            # be written. Waiting for all three would leave the browser polling forever on
+            # exactly the runs a user most needs an answer for.
+            flags_present = item or {}
+            if any(flags_present.get(flag) is False for flag in RESULT_FLAGS):
+                return _response(200, {"status": "done", **{flag: flags_present.get(flag) for flag in RESULT_FLAGS}})
+
             if not item or not all(flag in item for flag in RESULT_FLAGS):
                 return _response(200, {"status": "pending"})
 
