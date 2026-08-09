@@ -120,6 +120,8 @@ All submit-license names (function, role, CW policy, SQS policy) are env-suffixe
 - `data.archive_file.compare_details_lambda_function_archive_file` — zips `src/compare_details_lambda.py` to `build/compare_details_lambda.zip`.
 - `aws_lambda_function.compare_details_lambda_function` — Python 3.13, handler `compare_details_lambda.lambda_handler`, wired to its log group via `logging_config`. Exposes `TABLE` and `TOPIC` as runtime env vars. No event source of its own — invoked as step 3(b) by `DocumentStateMachine`.
 
+**`normalize()` — why the comparison is not raw string equality.** The two sides are written by different authors: the CSV is typed by a human or a web form, the other side is Textract reading the printed licence. They agree on the facts and disagree on formatting — a licence prints `NICK` / `01/12/1957` where a form submits `Nick` / `1957-01-12`. Raw `==` rejected a *correct* applicant on 5 of 8 fields (4 case, 1 date format). `normalize()` applies `.strip().upper()` to every field and, for `DATE_OF_BIRTH`, parses `%Y-%m-%d` then `%m/%d/%Y` and re-emits ISO. An unparseable date falls through to a text compare, so garbage still fails rather than matching other garbage. A mismatch now also `print`s the differing fields — a bare `False` in CloudWatch is undebuggable. **The frontend's `MOCK` data in `SubmitPanel.tsx` is written in normal casing and relies on this** — if that stops matching the sample licence, `normalize()` is what broke.
+
 ### App API Lambda
 
 - `aws_iam_role.app_api_lambda_role` — assume-role trust for `lambda.amazonaws.com`. Trust-policy `Sid` is the literal `"AppApiLambdaRole"`.
