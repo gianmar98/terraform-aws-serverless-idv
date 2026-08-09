@@ -16,7 +16,7 @@ resource "aws_apigatewayv2_api" "validate_license_api" {
     allow_methods     = ["GET", "POST", "OPTIONS"]
     allow_headers     = ["authorization", "content-type"]
     allow_credentials = false
-    max_age           = 300
+    max_age           = var.cors_max_age_seconds
   }
 }
 #------------------------------------

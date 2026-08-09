@@ -33,6 +33,9 @@ module "document_s3_bucket" {
   source                  = "../../modules/s3"
   document_s3_bucket_name = "${var.document_s3_bucket_name}${local.env_suffix}"
   document_retention_days = var.document_retention_days
+
+  document_bucket_cors_allow_origins = ["http://localhost:3000"]
+  cors_max_age_seconds               = var.cors_max_age_seconds
 }
 
 module "customer_metadata_dynamo_db_table" {
@@ -142,6 +145,7 @@ module "api_gateway" {
   cognito_user_pool_client_id = module.congito.user_pool_client_id
   cognito_issuer              = module.congito.issuer
   api_cors_allow_origins      = ["http://localhost:3000"]
+  cors_max_age_seconds        = var.cors_max_age_seconds
 }
 
 module "sqs" {

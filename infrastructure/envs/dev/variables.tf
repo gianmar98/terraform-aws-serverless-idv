@@ -317,3 +317,10 @@ variable "cognito_user_pool_client_name" {
   description = "This is the name of the authentication user pool from cognito"
   type        = string
 }
+
+
+# CORS -------------
+variable "cors_max_age_seconds" {
+  description = "How long a browser may cache the CORS preflight (OPTIONS) response. Shared by the document bucket and the HTTP API."
+  type        = number
+}
