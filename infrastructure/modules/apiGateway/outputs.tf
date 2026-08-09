@@ -30,6 +30,8 @@ output "api_endpoint_host" {
   value = replace(aws_apigatewayv2_api.validate_license_api.api_endpoint, "https://", "")
 }
 output "api_invoke_url" {
-  description = "Base invoke URL of the $default stage (for local dev NEXT_PUBLIC_API_BASE)."
-  value       = aws_apigatewayv2_stage.default.invoke_url
+  description = "Base invoke URL of the $default stage, no trailing slash (for local dev NEXT_PUBLIC_API_BASE)."
+  # trimsuffix for the same reason as license_validation_invoke_url: the $default stage's
+  # invoke_url ends in "/", and the frontend appends "/api/..." to it.
+  value = trimsuffix(aws_apigatewayv2_stage.default.invoke_url, "/")
 }

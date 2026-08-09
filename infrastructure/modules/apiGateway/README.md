@@ -46,7 +46,7 @@ Provisions `ValidateLicenseApi`, one HTTP API serving **two unrelated audiences*
 | `license_validation_invoke_url` | Invoke URL for `POST /license` — flows into the lambda module as the submit-license Lambda's `VALIDATE_LICENSE_API_URL` env var (the endpoint it POSTs to) |
 | `validate_license_api_execution_arn` | `execute-api` ARN — scope `execute-api:Invoke` against this, **not** the API's plain `arn` |
 | `api_endpoint_host` | API host with the scheme stripped, for use as a CloudFront origin `domain_name` (which rejects a full URL). Not consumed yet — §2.5 |
-| `api_invoke_url` | Base invoke URL of the `$default` stage, for the frontend's `NEXT_PUBLIC_API_BASE` in local dev |
+| `api_invoke_url` | Base invoke URL of the `$default` stage, for the frontend's `NEXT_PUBLIC_API_BASE` in local dev. `trimsuffix`ed — the raw stage URL ends in `/` and `frontend/lib/api.ts` appends `/api/...` to it |
 
 ## Cross-module dependencies
 
