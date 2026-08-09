@@ -66,6 +66,11 @@ response*.json
 # JetBrains IDE config
 .idea/
 
+# Assistant guidance + working design docs — local only, never committed
+CLAUDE.md
+frontend/CLAUDE.md
+frontend_tutorial.md
+
 
 # aws s3 cp 8d247914.zip s3://documentbucket-aci1-dev/zipped/
 # aws s3 cp 9c358026.zip s3://documentbucket-aci1-dev/zipped/
