@@ -70,12 +70,7 @@ export function LoginForm({
 
   const handleLogin = () =>
       run(async () => {
-        // await signIn({username: email, password}); // <- real Cognito call, restore once Cognito is deployed
-        if (email !== "giancusm@gmail.com" || password !== "123") { // <- synthetic authentication happens here
-          throw new Error("Invalid credentials");
-
-        }
-        sessionStorage.setItem("synthetic-auth","true"); //<<-- marks synthetic session, checked by page.tsx's gate
+        await signIn({username: email, password}); // <- real Cognito call
         router.push("/"); // page.tsx re-checks getCurrentUser() and renders SubmitPanel
       });
 
