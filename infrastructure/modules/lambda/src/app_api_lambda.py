@@ -15,10 +15,15 @@ import os
 import uuid
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 # One client per service, created once at import.
-s3 = boto3.client('s3')
+# signature_version is load-bearing: the default presigns with SigV2, and the bucket is
+# SSE-KMS, which only accepts SigV4 - the browser's PUT fails with a 403 InvalidArgument
+# ("Requests specifying Server Side Encryption with AWS KMS managed keys require AWS
+# Signature Version 4"). Nothing here fails; only the browser's later upload does.
+s3 = boto3.client('s3', config=Config(signature_version='s3v4'))
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(os.environ['TABLE'])
 bucket = os.environ['BUCKET']
