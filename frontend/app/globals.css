@@ -12,6 +12,11 @@
   --font-mono: var(--font-mono);
   --color-ink: var(--color-ink);
   --color-paper: var(--color-paper);
+  /* Registering surface is what makes `bg-surface` exist as a utility. It was declared in
+     :root but never mapped here, so both cards fell back to bg-paper - the same value as the
+     page background - and the "inspection surface floating on document paper" idea from
+     tutorial 6.2 never actually rendered. */
+  --color-surface: var(--color-surface);
   --color-thread: var(--color-thread);
   --color-thread-strong: var(--color-thread-strong);
   --color-line: var(--color-line);
@@ -84,7 +89,11 @@
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
   --border: var(--color-line);
-  --input: var(--color-line);
+  /* Control borders are NOT --color-line. `line` (#C9D2DD) is 1.53:1 on white: fine for a
+     decorative divider, but an input's border is the only thing identifying the control here
+     (input and card are both white), so WCAG 1.4.11 wants 3:1. #8B919D is ink at 50% over
+     white and measures 3.18:1. --border stays light because card edges are decorative. */
+  --input: #8b919d;
   --ring: var(--color-thread);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
@@ -145,5 +154,40 @@
   }
   html {
     @apply font-sans;
+    /* Opt into the font's real optical sizing rather than the browser's synthetic scaling. */
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Security-thread teal selection instead of the browser's default blue - a small cue that
+     the whole surface belongs to one palette. */
+  ::selection {
+    background-color: var(--color-thread);
+    color: var(--color-paper);
+  }
+
+  /* One visible focus treatment for every interactive element, offset against the card it
+     sits on rather than the page. WCAG 2.4.7 - the ui-ux-pro-max `focus-states` rule. */
+  :focus-visible {
+    outline: 2px solid var(--color-thread);
+    outline-offset: 2px;
+  }
+
+  /* Numbers in results, ids, and the MRZ must not reflow as digits change width. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Honour the OS "reduce motion" setting globally, not per-component. Required by the brief's
+   accessibility pass and the design-system `reduced-motion` rule. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

@@ -18,7 +18,7 @@ export function DobPicker({value,onChange}:{value:string, onChange: (v:string)=>
     <Popover open={open} onOpenChange={setOpen}>
       {/* className mirrors the plain <input> classes in SubmitPanel so this field lines up with its neighbours */}
       <PopoverTrigger render={<Button variant={"outline"} data-empty={!date}
-          className="h-auto w-full justify-between rounded-md border border-line px-3 py-2 text-left font-normal data-[empty=true]:text-muted-foreground focus-visible:ring-2 focus-visible:ring-thread focus-visible:ring-offset-1">
+          className="h-auto w-full justify-between rounded-md border border-ink/50 px-3 py-2 text-left font-normal data-[empty=true]:text-muted-foreground focus-visible:ring-2 focus-visible:ring-thread focus-visible:ring-offset-1">
           {date ? format(date, "PPP") : <span>Pick a date</span>}
           <ChevronDownIcon data-icon="inline-end" />
       </Button>} />
