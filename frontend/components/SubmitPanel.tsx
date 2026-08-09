@@ -19,17 +19,20 @@ import MrzStrip from "@/components/MrzStrip";
 const MAX_ZIP_BYTES = 20 * 1024 * 1024;
 const mb = (b: number) => (b / 1024 / 1024).toFixed(1);
 
-//Realistic Mock data
+// Mock data matching the sample licence in TestZipUpload/8d247914_license.png, so submitting
+// the form as-is (with that licence + selfie) produces a PASS.
+// Written in normal casing on purpose: the licence prints "NICK SAMPLE" in all-caps, and
+// compare_details_lambda.py normalizes both sides (upper + date parsing) before comparing.
+// If this ever stops matching, that normalizer is the thing that broke.
 const MOCK: LicenseDetails = {
-  FIRST_NAME: "Giancarlo",
-  LAST_NAME: "Martinez",
-  DOCUMENT_NUMBER: "S123-4567-8901",
-  // DATE_OF_BIRTH: "2025-15-21",
-  DATE_OF_BIRTH: "",
-  ADDRESS: "742 Evergreen Terrace",
-  STATE_IN_ADDRESS: "CA",
-  CITY_IN_ADDRESS: "Springfield",
-  ZIP_CODE_IN_ADDRESS: "90210",
+  FIRST_NAME: "Nick",
+  LAST_NAME: "Sample",
+  DOCUMENT_NUMBER: "S123456579010",
+  DATE_OF_BIRTH: "1957-01-12", // DobPicker's yyyy-MM-dd; the licence prints 01/12/1957
+  ADDRESS: "123 Main Street",
+  STATE_IN_ADDRESS: "FL",
+  CITY_IN_ADDRESS: "Tallahassee",
+  ZIP_CODE_IN_ADDRESS: "000001234",
 };
 
 export default function SubmitPanel(){
