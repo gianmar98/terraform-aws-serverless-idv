@@ -187,4 +187,5 @@ module "congito" {
   source                        = "../../modules/cognito"
   cognito_user_pool_name        = "${var.cognito_user_pool_name}${local.env_suffix}"
   cognito_user_pool_client_name = "${var.cognito_user_pool_client_name}${local.env_suffix}"
+  seed_users                    = var.seed_users
 }

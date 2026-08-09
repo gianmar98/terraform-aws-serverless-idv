@@ -317,6 +317,11 @@ variable "cognito_user_pool_client_name" {
   description = "This is the name of the authentication user pool from cognito"
   type        = string
 }
+variable "seed_users" {
+  description = "Demo logins for the dev Cognito pool, as email => password."
+  type        = map(string)
+  sensitive   = true
+}
 
 
 # CORS -------------
