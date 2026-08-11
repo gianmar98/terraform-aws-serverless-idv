@@ -71,9 +71,9 @@ resource "aws_cognito_user" "seed" {
   for_each = nonsensitive(toset(keys(var.seed_users))) //"keys" are just the email addresses
 
 
-  user_pool_id = aws_cognito_user_pool.license_validation_users.id//which pool to put the users in
-  username     = each.key                 //the pool sets username_attributes = ["email"], so username IS the email
-  password     = var.seed_users[each.key] //still secret - read straight from the map
+  user_pool_id = aws_cognito_user_pool.license_validation_users.id //which pool to put the users in
+  username     = each.key                                          //the pool sets username_attributes = ["email"], so username IS the email
+  password     = var.seed_users[each.key]                          //still secret - read straight from the map
 
   attributes = {
     email = each.key

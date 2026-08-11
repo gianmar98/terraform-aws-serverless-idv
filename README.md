@@ -184,3 +184,9 @@ Every resource inherits these tags via the provider's `default_tags` block:
 | `ManagedBy`  | `Terraform`                 |
 
 Pinned module versions and Terraform-specific notes/gotchas live in `CLAUDE.md` and each module's own `README.md`.
+
+## License
+
+Licensed under the **Apache License, Version 2.0** — see [`LICENSE`](LICENSE). Every first-party source file carries a matching `SPDX-License-Identifier: Apache-2.0` header.
+
+One exception: the shadcn/ui components generated into `frontend/components/ui/` and `frontend/lib/utils.ts` are **MIT** (Copyright © 2023 shadcn) and stay under that license. See [`NOTICE`](NOTICE) for the details and for the Base UI attribution those components inherit.

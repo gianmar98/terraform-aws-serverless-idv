@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Giancarlo Martinez
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 
 locals {
   log_group_name        = "/aws/lambda/${var.document_lambda_function_name}"

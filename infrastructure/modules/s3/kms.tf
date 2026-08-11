@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Giancarlo Martinez
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 
 # KMS ---------------------------------------------------------------------------------
 # Customer managed key for the document bucket. The bucket holds PII (selfies, driver's

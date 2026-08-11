@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Giancarlo Martinez
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 
 module "document_s3_bucket" {
   source        = "terraform-aws-modules/s3-bucket/aws"
