@@ -2,16 +2,17 @@
 
 import type {ReactNode} from "react";
 import {useEffect, useRef, useState} from "react";
-// import {signOut} from "aws-amplify/auth";
+import {useRouter} from "next/navigation";
+import {signOut} from "aws-amplify/auth";
 import {LICENSE_FIELDS, type LicenseDetails, type StatusResponse} from "@/lib/types";
 import { requestUploadUrl, uploadZip, fetchStatus} from "@/lib/api";
 import {buildSubmissionZip} from "@/lib/zip";
 import {DobPicker} from "@/components/DobPicker";
 import MrzStrip from "@/components/MrzStrip";
 
-// import Props {
-//     onSignOut: () => void;
-// }
+// No onSignOut prop: page.tsx renders <SubmitPanel/> with no props, and the only thing a
+// parent would do on sign-out is the redirect below - one call site, so the handler lives
+// here rather than as a callback threaded through props.
 
 // Mirrors MAX_ZIP_BYTES in unzip_lambda.py — the archive is rejected server-side above this.
 // ponytail: checked against the raw image bytes, not the built zip. PNG/JPEG barely deflate,
@@ -71,6 +72,7 @@ const MOCK: LicenseDetails = {
 };
 
 export default function SubmitPanel(){
+  const router = useRouter();
   const [details, setDetails] = useState<LicenseDetails>(MOCK);
   const [license, setLicense] = useState<File | null>(null);
   const [selfie, setSelfie] = useState<File | null>(null);
@@ -152,7 +154,10 @@ export default function SubmitPanel(){
           </p>
         </div>
         <button
-          // onClick={() => signOut().then(onSignOut)}
+          // .finally, not .then: redirect even if signOut rejects, so the button is never a
+          // silent no-op. Worst case the session survives and page.tsx's getCurrentUser()
+          // gate catches it on the way back in.
+          onClick={() => signOut().finally(() => router.push("/login"))}
           className={"shrink-0 rounded-md border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink/70 transition-colors duration-200 hover:border-ink/25 hover:text-ink"}
         >
           Sign Out
