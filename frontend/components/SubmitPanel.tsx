@@ -9,6 +9,7 @@ import { requestUploadUrl, uploadZip, fetchStatus} from "@/lib/api";
 import {buildSubmissionZip} from "@/lib/zip";
 import {DobPicker} from "@/components/DobPicker";
 import MrzStrip from "@/components/MrzStrip";
+import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover";
 
 // No onSignOut prop: page.tsx renders <SubmitPanel/> with no props, and the only thing a
 // parent would do on sign-out is the redirect below - one call site, so the handler lives
@@ -44,6 +45,17 @@ const fieldInput =
 // The left rule makes the alert scannable without relying on colour alone (WCAG 1.4.1).
 const alertBox =
   "mt-4 rounded-md border-l-2 border-fail bg-fail/[0.07] px-3 py-2 text-sm text-fail";
+
+// Shared by the two header buttons (Demo data, Sign Out) so they read as one control pair.
+const headerButton =
+  "shrink-0 cursor-pointer rounded-md border border-line bg-surface px-3 py-1.5 text-sm " +
+  "font-medium text-ink/70 transition-colors duration-200 hover:border-ink/25 hover:text-ink";
+
+// Download links for the sample documents in public/. A plain anchor with `download` is the
+// whole feature - no JS, and it still works from the static export behind CloudFront.
+const downloadLink =
+  "flex-1 rounded-md border border-ink/50 px-2.5 py-1.5 text-center font-mono text-[11px] " +
+  "uppercase tracking-[0.12em] text-ink/70 transition-colors duration-200 hover:border-ink/70 hover:text-ink";
 
 // Small caps rule that separates the form into scannable groups.
 function SectionLabel({children}: {children: ReactNode}) {
@@ -82,6 +94,14 @@ export default function SubmitPanel(){
   // const [status, setStatus] = useState<StatusResponse | null>({status: "done", LICENSE_SELFIE_MATCH: true, LICENSE_VALIDATION:false, LICENSE_DETAILS_MATCH:null});
   const [error, setError] = useState<string |null>(null);
   const [busy, setBusy] = useState(false);
+  // Which demo field was just copied, so that one row can confirm itself for a moment.
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  async function copyField(field: string, value: string) {
+    await navigator.clipboard.writeText(value);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 1200);
+  }
 
   // holds timer's ID, without causing component to re-render when it changes
   //setInterval() start a timer that gives back ID so you can stop it later with clearInterval(id)
@@ -153,15 +173,62 @@ export default function SubmitPanel(){
             We compare your details and selfie against the document you upload.
           </p>
         </div>
-        <button
-          // .finally, not .then: redirect even if signOut rejects, so the button is never a
-          // silent no-op. Worst case the session survives and page.tsx's getCurrentUser()
-          // gate catches it on the way back in.
-          onClick={() => signOut().finally(() => router.push("/login"))}
-          className={"shrink-0 rounded-md border border-line bg-surface px-3 py-1.5 text-sm font-medium text-ink/70 transition-colors duration-200 hover:border-ink/25 hover:text-ink"}
-        >
-          Sign Out
-        </button>
+        <div className={"flex shrink-0 items-center gap-2"}>
+          {/* Everything a tester needs to try the happy path: the exact values the form is
+              prefilled with (click a row to copy one back if you edit it), and the two sample
+              documents they must upload. These are the real 8d247914 fixtures, so submitting
+              them unchanged produces three PASS flags. */}
+          <Popover>
+            <PopoverTrigger className={headerButton}>Demo data</PopoverTrigger>
+            <PopoverContent align={"end"} className={"w-80 bg-surface text-ink ring-ink/10"}>
+              <p className={"font-mono text-[10px] uppercase tracking-[0.2em] text-ink/65"}>
+                Demo test data
+              </p>
+              <p className={"text-[13px] leading-5 text-ink/65"}>
+                Already filled in below. Click a field to copy it.
+              </p>
+              <div className={"flex flex-col overflow-hidden rounded-md border border-line"}>
+                {Object.entries(MOCK).map(([field, value]) => (
+                  <button
+                    key={field}
+                    type={"button"}
+                    onClick={() => copyField(field, value)}
+                    className={
+                      "flex items-center justify-between gap-3 border-b border-line/70 px-2.5 py-1.5 " +
+                      "text-left transition-colors duration-200 last:border-b-0 hover:bg-thread/[0.06]"
+                    }
+                  >
+                    <span className={"font-mono text-[10px] uppercase tracking-[0.12em] text-ink/65"}>
+                      {field.replaceAll("_", " ").toLowerCase()}
+                    </span>
+                    {/* Swapping the value for "copied" keeps the confirmation off colour alone
+                        (WCAG 1.4.1) - a tick-plus-green would carry the same meaning twice. */}
+                    <span className={"font-mono text-[12px] text-ink"}>
+                      {copiedField === field ? "copied" : value}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <div className={"flex gap-2"}>
+                <a href={"/demo_license.png"} download={"demo_license.png"} className={downloadLink}>
+                  Licence
+                </a>
+                <a href={"/demo_selfie.png"} download={"demo_selfie.png"} className={downloadLink}>
+                  Selfie
+                </a>
+              </div>
+            </PopoverContent>
+          </Popover>
+          <button
+            // .finally, not .then: redirect even if signOut rejects, so the button is never a
+            // silent no-op. Worst case the session survives and page.tsx's getCurrentUser()
+            // gate catches it on the way back in.
+            onClick={() => signOut().finally(() => router.push("/login"))}
+            className={headerButton}
+          >
+            Sign Out
+          </button>
+        </div>
 
       </header>
 
