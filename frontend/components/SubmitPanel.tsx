@@ -168,7 +168,7 @@ export default function SubmitPanel(){
             <label key={field} className={"block"}>
               <span className={fieldLabel}>{field.replaceAll("_"," ").toLowerCase()}</span>
               <input
-                value={details[field]}
+                placeholder={details[field]}
                 onChange={(e) => setDetails({...details, [field]:e.target.value})}
                 className={fieldInput}
               />
