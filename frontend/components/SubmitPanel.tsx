@@ -89,9 +89,7 @@ export default function SubmitPanel(){
   const [license, setLicense] = useState<File | null>(null);
   const [selfie, setSelfie] = useState<File | null>(null);
   const [uuid, setUuid] = useState<string | null>(null);
-  // const [uuid, setUuid] = useState<string | null>("test-uuid-123");
   const [status, setStatus] = useState<StatusResponse | null>(null);
-  // const [status, setStatus] = useState<StatusResponse | null>({status: "done", LICENSE_SELFIE_MATCH: true, LICENSE_VALIDATION:false, LICENSE_DETAILS_MATCH:null});
   const [error, setError] = useState<string |null>(null);
   const [busy, setBusy] = useState(false);
   // Which demo field was just copied, so that one row can confirm itself for a moment.
