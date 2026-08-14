@@ -13,11 +13,6 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {useRouter} from "next/navigation";
-// TODO: import { useRouter } from "next/navigation";
-//   Needed so a successful login can redirect to "/" (see tutorial 3.9 — page.tsx
-//   redirects unauthenticated users to /login, so login needs the reverse redirect).
-// TODO: import { signIn, signUp, confirmSignUp } from "aws-amplify/auth";
-//   These are the three Cognito calls this form drives, one per Mode.
 
 //"mode" is a state machine: which form are we showing?
 type Mode = "login" | "signup" | "confirm"
@@ -27,33 +22,21 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  // TODO: const router = useRouter();
-  //   Router instance used only in handleLogin's success path.
   const router = useRouter();
 
-  // TODO: const [mode, setMode] = useState<Mode>("login");
-  //   Drives which of the three forms below renders. Right now this file only
-  //   ever shows the login form — swapping mode is what makes "Sign up" work.
+  // Picks which of the three forms renders. Only the login form is built, so this
+  // never leaves "login" yet — see tutorial 3.7 for the other two.
   const [mode, setMode] = useState<Mode>("login");
 
-  // TODO: controlled-input state, one pair per field the active mode needs:
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [code, setCode] = useState("");       // confirm mode only
-  //   Inputs below are currently uncontrolled (no value/onChange) — nothing
-  //   typed into them is readable in JS yet, so there's nothing to submit.
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");   // confirm mode only
 
-  // TODO: const [error, setError] = useState<string | null>(null);
-  //   Surfaced under the submit button; mirrors the pattern in SubmitPanel.tsx.
   const [error, setError] = useState<string | null>(null);
-  // TODO: const [busy, setBusy] = useState(false);
-  //   Disables the submit button while an Amplify call is in flight.
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(false); // true while a Cognito call is in flight
 
-  // TODO: async function run(fn: () => Promise<void>) { ... }
-  //   Shared try/setBusy(true)/catch(setError)/finally(setBusy(false)) wrapper —
-  //   handleLogin/handleSignUp/handleConfirm all repeat this, so wrap once
-  //   instead of three times (see SubmitPanel.tsx's handleSubmit for the same shape).
+  // All three handlers need the same busy/error bookkeeping around one Cognito call,
+  // so it lives here once rather than being repeated in each of them.
   async function run(action:() => Promise<void>){ //actual work to do
     setError(null); // clear old error messages
     setBusy(true);  //show "loading" disables button
@@ -72,8 +55,8 @@ export function LoginForm({
         router.push("/"); // page.tsx re-checks getCurrentUser() and renders SubmitPanel
       });
 
-  // TODO: Only needed once you add a "Sign up" form (mode === "signup"); the block
-  //   for that form isn't in this file yet — see tutorial 3.7 for the shape.
+  // Creates the account. Cognito then emails a code that handleConfirm exchanges for a
+  // confirmed user. Unreachable until a signup form renders.
   const handleSignup = () =>
       run(async () => {
         await signUp({
@@ -83,18 +66,15 @@ export function LoginForm({
         })
       })
 
-  // TODO: Same — only needed once a confirm-code form exists.
+  // Second half of signup: trades the emailed code for a confirmed account.
+  // Also unreachable until a confirm form renders.
   const handleConfirm = () =>
       run(async () => {
         await confirmSignUp({username: email, confirmationCode: code}); //Cognito confirmation code it emails after sign up
       });
 
-  // TODO: const submit = mode === "login" ? handleLogin : mode === "signup" ? handleSignUp : handleConfirm;
-  //   `submit` is just a variable holding a reference to whichever handler
-  //   function matches the current mode — a const CAN hold a function, and
-  //   calling submit() below calls whatever function it currently points to.
-  //   Needed because the form onSubmit below already calls submit(), but
-  //   nothing defines it yet (that's the TS2552 "Cannot find name 'submit'" error).
+  // Holds whichever handler matches the current mode, so the form below can just call
+  // submit() without knowing which one it got.
   const submit = mode=== "login" ? handleLogin: mode === "signup" ? handleSignup : handleConfirm;
 
   return (
@@ -126,15 +106,9 @@ export function LoginForm({
                 />
               </Field>
               <Field>
-                <div className="flex items-center">
-                  <FieldLabel htmlFor="password" className="text-ink/65">Password</FieldLabel>
-                  <a
-                    href="#"
-                    className="ml-auto text-sm text-ink/65 underline underline-offset-2 hover:text-ink"
-                  >
-                    Forgot your password?
-                  </a>
-                </div>
+                {/* "Forgot your password?" was removed with the rest of the dead links:
+                    Cognito's reset flow isn't wired up, so it was a link to nowhere. */}
+                <FieldLabel htmlFor="password" className="text-ink/65">Password</FieldLabel>
                 <Input
                   id="password"
                   type="password"
@@ -199,10 +173,11 @@ export function LoginForm({
           </div>
         </CardContent>
       </Card>
-      <FieldDescription className="px-6 text-center text-ink/65">
-        By clicking continue, you agree to our <a href="#" className="underline hover:text-ink">Terms of Service</a>{" "}
-        and <a href="#" className="underline hover:text-ink">Privacy Policy</a>.
-      </FieldDescription>
+      {/* Replaces shadcn's Terms of Service / Privacy Policy line, which linked nowhere.
+          Set in the same mono / uppercase / wide-tracked voice as the field keys. */}
+      <p className="text-center font-mono text-[11px] uppercase tracking-[0.18em] text-ink/65">
+        Built by Giancarlo Martinez · ACI Capstone 1
+      </p>
     </div>
   )
 }

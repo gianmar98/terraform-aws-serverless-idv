@@ -22,7 +22,7 @@ export default function Home() {
     if (signedIn ===null) {
         return (
             <div className="flex min-h-svh items-center justify-center" role="status" aria-live="polite">
-                <p className="font-mono text-xs uppercase tracking-[0.2em] text-ink/40 motion-safe:animate-pulse">
+                <p className="font-mono text-xs uppercase tracking-[0.2em] text-ink/65 motion-safe:animate-pulse">
                     Verifying session
                 </p>
             </div>
