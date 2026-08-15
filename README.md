@@ -100,7 +100,7 @@ The other three pipeline Lambdas are untraced and appear as flat call targets �
 │   │   │   ├── variables.tf
 │   │   │   ├── outputs.tf
 │   │   │   └── README.md
-│   │   ├── apiGateway/        # ValidateLicenseApi HTTP API (POST /license) -> validation Lambda
+│   │   ├── apiGateway/        # ValidateLicenseApi HTTP API: POST /license (IAM) -> Validate; /api/* (Cognito JWT) -> AppApi
 │   │   │   ├── apigw.tf
 │   │   │   ├── variables.tf
 │   │   │   ├── outputs.tf
@@ -110,15 +110,25 @@ The other three pipeline Lambdas are untraced and appear as flat call targets �
 │   │   │   ├── variables.tf
 │   │   │   ├── outputs.tf      # exposes queue arn, DLQ arn, queue name, queue url
 │   │   │   └── README.md
-│   │   └── stepFunction/      # DocumentStateMachine + S3 -> EventBridge -> Step Functions trigger
-│   │       ├── DocumentStateMachine.tf  # state machine, its IAM role/policy, bucket notification, EventBridge rule/target/role
+│   │   ├── stepFunction/      # DocumentStateMachine + S3 -> EventBridge -> Step Functions trigger
+│   │   │   ├── DocumentStateMachine.tf  # state machine, its IAM role/policy, bucket notification, EventBridge rule/target/role
+│   │   │   ├── variables.tf
+│   │   │   ├── outputs.tf
+│   │   │   └── README.md
+│   │   ├── cognito/           # User pool + public SPA app client + seed users (frontend auth)
+│   │   │   ├── congnito.tf     # note: filename is misspelled, left alone to avoid a state move
+│   │   │   ├── variables.tf
+│   │   │   ├── outputs.tf
+│   │   │   └── README.md
+│   │   └── s3Site/            # Public bucket + S3 static website hosting for the frontend
+│   │       ├── s3.tf           # bucket, website config, public access block, public-read policy
 │   │       ├── variables.tf
 │   │       ├── outputs.tf
 │   │       └── README.md
 │   └── envs/
 │       └── dev/
 │           ├── backend.tf       # state at envs/dev/terraform.tfstate
-│           ├── main.tf          # composes all 7 sub-modules
+│           ├── main.tf          # composes all 9 sub-modules
 │           ├── variables.tf     # pass-through declarations
 │           ├── outputs.tf       # forwards each sub-module's outputs
 │           └── terraform.tfvars # gitignored

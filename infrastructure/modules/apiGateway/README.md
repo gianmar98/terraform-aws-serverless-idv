@@ -34,7 +34,7 @@ Provisions `ValidateLicenseApi`, one HTTP API serving **two unrelated audiences*
 | `app_api_lambda_function_name` | `string` | Function name of the app API Lambda — used by its invoke permission |
 | `cognito_user_pool_client_id` | `string` | Cognito app client ID — the JWT `audience` |
 | `cognito_issuer` | `string` | Cognito JWT issuer URL — the JWT `issuer` |
-| `api_cors_allow_origins` | `list(string)` | Allowed CORS origins. Currently passed inline from `envs/dev/main.tf` as `["http://localhost:3000"]`, not a tfvars dial — the CloudFront domain must be added here once it exists |
+| `api_cors_allow_origins` | `list(string)` | Allowed CORS origins. Passed inline from `envs/dev/main.tf` as `["http://localhost:3000", local.site_origin]`, not a tfvars dial — `local.site_origin` is the S3 website endpoint of `modules/s3Site`. The CloudFront domain joins the list once it exists |
  | `cors_max_age_seconds` | `number` | `cors_configuration.max_age` — how long a browser may cache the preflight. Set in `envs/dev/terraform.tfvars` (`300`) and shared with `modules/s3`'s document-bucket CORS rule, so changing it moves both |
 
 ## Outputs

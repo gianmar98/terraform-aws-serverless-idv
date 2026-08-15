@@ -21,7 +21,7 @@ Provisions the document storage S3 bucket, its KMS customer managed key, and a T
 |---|---|---|
 | `document_s3_bucket_name` | `string` | Name of the document S3 bucket |
 | `document_retention_days` | `number` | Days after upload that `zipped/`/`unzipped/` objects expire. Set per-env in `envs/dev/terraform.tfvars`; falls back to `30` if the caller omits it. Validated `> 0`. |
-| `document_bucket_cors_allow_origins` | `list(string)` | Origins allowed to presign-PUT to the bucket. Required (no default). Passed inline from `envs/dev/main.tf` as `["http://localhost:3000"]`, not a tfvars dial — the CloudFront domain must be added there once it exists |
+| `document_bucket_cors_allow_origins` | `list(string)` | Origins allowed to presign-PUT to the bucket. Required (no default). Passed inline from `envs/dev/main.tf` as `["http://localhost:3000", local.site_origin]`, not a tfvars dial — `local.site_origin` is the S3 website endpoint of `modules/s3Site`. The CloudFront domain joins the list once it exists |
 | `cors_max_age_seconds` | `number` | How long a browser may cache the CORS preflight. Set in `envs/dev/terraform.tfvars` (`300`) and shared with `modules/apiGateway`'s `cors_configuration.max_age` |
 
 ## Outputs
