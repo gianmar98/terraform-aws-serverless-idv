@@ -80,7 +80,7 @@ The other three pipeline Lambdas are untraced and appear as flat call targets �
 │   │   │   ├── variables.tf
 │   │   │   ├── outputs.tf
 │   │   │   └── README.md
-│   │   ├── lambda/            # IAM (roles + inline + managed), 7 Lambda functions, log groups, SQS trigger
+│   │   ├── lambda/            # IAM (roles + inline + managed), 8 Lambda functions, log groups, SQS trigger
 │   │   │   ├── lambda_policies.tf              # roles, inline + managed policies, attachments, log groups
 │   │   │   ├── document_lambda_function.tf     # monolithic document function — entirely commented out
 │   │   │   ├── validate_lambda_function.tf     # validation function + archive_file
@@ -89,7 +89,8 @@ The other three pipeline Lambdas are untraced and appear as flat call targets �
 │   │   │   ├── write_to_dynamo_lambda_function.tf # write-to-dynamo function + archive_file (invoked by the state machine)
 │   │   │   ├── compare_faces_lambda_function.tf   # compare-faces function + archive_file (invoked by the state machine)
 │   │   │   ├── compare_details_lambda_function.tf # compare-details function + archive_file (invoked by the state machine)
-│   │   │   ├── src/                            # Python handlers (s3_upload.py, validate_lambda.py, submit_license.py, unzip_lambda.py, write_to_dynamo_lambda.py, compare_faces_lambda.py, compare_details_lambda.py)
+│   │   │   ├── app_api_lambda_function.tf      # browser-facing app API function + archive_file (no trigger yet — see modules/lambda/README.md)
+│   │   │   ├── src/                            # Python handlers (s3_upload.py, validate_lambda.py, submit_license.py, unzip_lambda.py, write_to_dynamo_lambda.py, compare_faces_lambda.py, compare_details_lambda.py, app_api_lambda.py)
 │   │   │   ├── build/                      # archive_file zip output (gitignored)
 │   │   │   ├── variables.tf
 │   │   │   ├── outputs.tf
@@ -99,7 +100,7 @@ The other three pipeline Lambdas are untraced and appear as flat call targets �
 │   │   │   ├── variables.tf
 │   │   │   ├── outputs.tf
 │   │   │   └── README.md
-│   │   ├── apiGateway/        # ValidateLicenseApi HTTP API (POST /license) -> validation Lambda
+│   │   ├── apiGateway/        # ValidateLicenseApi HTTP API: POST /license (IAM) -> Validate; /api/* (Cognito JWT) -> AppApi
 │   │   │   ├── apigw.tf
 │   │   │   ├── variables.tf
 │   │   │   ├── outputs.tf
@@ -109,15 +110,25 @@ The other three pipeline Lambdas are untraced and appear as flat call targets �
 │   │   │   ├── variables.tf
 │   │   │   ├── outputs.tf      # exposes queue arn, DLQ arn, queue name, queue url
 │   │   │   └── README.md
-│   │   └── stepFunction/      # DocumentStateMachine + S3 -> EventBridge -> Step Functions trigger
-│   │       ├── DocumentStateMachine.tf  # state machine, its IAM role/policy, bucket notification, EventBridge rule/target/role
+│   │   ├── stepFunction/      # DocumentStateMachine + S3 -> EventBridge -> Step Functions trigger
+│   │   │   ├── DocumentStateMachine.tf  # state machine, its IAM role/policy, bucket notification, EventBridge rule/target/role
+│   │   │   ├── variables.tf
+│   │   │   ├── outputs.tf
+│   │   │   └── README.md
+│   │   ├── cognito/           # User pool + public SPA app client + seed users (frontend auth)
+│   │   │   ├── congnito.tf     # note: filename is misspelled, left alone to avoid a state move
+│   │   │   ├── variables.tf
+│   │   │   ├── outputs.tf
+│   │   │   └── README.md
+│   │   └── s3Site/            # Public bucket + S3 static website hosting for the frontend
+│   │       ├── s3.tf           # bucket, website config, public access block, public-read policy
 │   │       ├── variables.tf
 │   │       ├── outputs.tf
 │   │       └── README.md
 │   └── envs/
 │       └── dev/
 │           ├── backend.tf       # state at envs/dev/terraform.tfstate
-│           ├── main.tf          # composes all 7 sub-modules
+│           ├── main.tf          # composes all 9 sub-modules
 │           ├── variables.tf     # pass-through declarations
 │           ├── outputs.tf       # forwards each sub-module's outputs
 │           └── terraform.tfvars # gitignored
@@ -183,3 +194,9 @@ Every resource inherits these tags via the provider's `default_tags` block:
 | `ManagedBy`  | `Terraform`                 |
 
 Pinned module versions and Terraform-specific notes/gotchas live in `CLAUDE.md` and each module's own `README.md`.
+
+## License
+
+Licensed under the **Apache License, Version 2.0** — see [`LICENSE`](LICENSE). Every first-party source file carries a matching `SPDX-License-Identifier: Apache-2.0` header.
+
+One exception: the shadcn/ui components generated into `frontend/components/ui/` and `frontend/lib/utils.ts` are **MIT** (Copyright © 2023 shadcn) and stay under that license. See [`NOTICE`](NOTICE) for the details and for the Base UI attribution those components inherit.

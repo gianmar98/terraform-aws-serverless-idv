@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Giancarlo Martinez
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 
 output "document_bucket_name" {
   description = "Name of the document S3 bucket"
@@ -51,12 +51,44 @@ output "validate_sqs_queue_arn" {
   value       = module.sqs.sqs_license_queue_arn
 }
 
+# Names are for humans (finding the pool in the console); nothing consumes them.
 output "cognito_user_pool_name" {
-  description = "Name of the Cognito user pool"
+  description = "Env-suffixed name of the Cognito user pool"
   value       = module.congito.cognito_user_pool_name
 }
 
 output "cognito_user_pool_client_name" {
-  description = "Name of the Cognito user pool Client"
+  description = "Env-suffixed name of the pool's SPA app client"
   value       = module.congito.cognito_user_pool_client_name
+}
+
+# The three frontend_* outputs fill frontend/.env.local — the browser needs IDs, not names.
+output "frontend_user_pool_id" {
+  description = "User pool ID -> NEXT_PUBLIC_USER_POOL_ID. Tells Amplify which pool to authenticate against."
+  value       = module.congito.user_pool_id
+}
+
+output "frontend_user_pool_client_id" {
+  description = "App client ID -> NEXT_PUBLIC_USER_POOL_CLIENT_ID. Also the 'aud' claim the API's JWT authorizer checks."
+  value       = module.congito.user_pool_client_id
+}
+
+output "frontend_api_invoke_url" {
+  description = "API base URL, no trailing slash -> NEXT_PUBLIC_API_BASE. Local dev only; in prod the app calls /api/* same-origin through CloudFront."
+  value       = module.api_gateway.api_invoke_url
+}
+
+output "site_bucket_name" {
+  description = "Name/ID of the site bucket"
+  value       = module.site_bucket.site_bucket_name
+}
+
+output "site_website_endpoint" {
+  description = "Website endpoint host URL"
+  value       = module.site_bucket.site_website_endpoint
+}
+
+output "site_website_url" {
+  description = "Full URL of the s3 endpoint of the site"
+  value       = module.site_bucket.site_website_url
 }

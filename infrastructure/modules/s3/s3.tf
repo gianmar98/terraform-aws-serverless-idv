@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Giancarlo Martinez
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 
 module "document_s3_bucket" {
   source        = "terraform-aws-modules/s3-bucket/aws"
@@ -53,4 +53,16 @@ module "document_s3_bucket" {
 resource "aws_s3_object" "zipped_prefix" {
   bucket = module.document_s3_bucket.s3_bucket_id
   key    = "zipped/"
+}
+
+#CORS so browser can PUT the zip file to a presigned URL from the CloudFront origin
+resource "aws_s3_bucket_cors_configuration" "document_bucket_cors" {
+  bucket = module.document_s3_bucket.s3_bucket_id
+
+  cors_rule {
+    allowed_methods = ["PUT"]
+    allowed_origins = var.document_bucket_cors_allow_origins # ["https://<cf-domain>", "http://localhost:3000"]
+    allowed_headers = ["*"]
+    max_age_seconds = var.cors_max_age_seconds
+  }
 }

@@ -22,3 +22,16 @@ output "validate_license_api_execution_arn" {
   description = "execute-api ARN of the API (arn:aws:execute-api:region:account:api-id) — scope execute-api:Invoke against this, not the API's own ARN"
   value       = aws_apigatewayv2_api.validate_license_api.execution_arn
 }
+
+# Regional API host (no scheme) for use as a CloudFront origin domain.
+output "api_endpoint_host" {
+  description = "API Gateway host, e.g. abc123.execute-api.us-east-1.amazonaws.com"
+  #CLOUDFRONT wants bare host name, not a URL
+  value = replace(aws_apigatewayv2_api.validate_license_api.api_endpoint, "https://", "")
+}
+output "api_invoke_url" {
+  description = "Base invoke URL of the $default stage, no trailing slash (for local dev NEXT_PUBLIC_API_BASE)."
+  # trimsuffix for the same reason as license_validation_invoke_url: the $default stage's
+  # invoke_url ends in "/", and the frontend appends "/api/..." to it.
+  value = trimsuffix(aws_apigatewayv2_stage.default.invoke_url, "/")
+}

@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Giancarlo Martinez
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 
 terraform {
   backend "s3" {

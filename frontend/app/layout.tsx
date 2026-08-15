@@ -3,7 +3,6 @@ import {plexMono, plexSans} from "@/app/fonts";
 import type { Metadata } from "next";
 import "./globals.css";
 import ConfigureAmplify from "@/app/ConfigureAmplify";
-import { cn } from "@/lib/utils";
 
 
 export const metadata: Metadata = {

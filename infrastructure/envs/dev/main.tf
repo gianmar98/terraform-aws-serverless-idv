@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Giancarlo Martinez
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 
 terraform {
   required_version = ">= 1.10.0"
@@ -8,13 +8,19 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.4"
     }
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.5"
+    }
   }
 }
 
 data "aws_caller_identity" "currentUser" {}
 data "aws_region" "currentUser" {}
 locals {
-  env_suffix = "-${var.project_environment}"
+  env_suffix       = "-${var.project_environment}"
+  site_bucket_name = "${var.site_bucket_name}${local.env_suffix}"
+  site_origin      = "http://${local.site_bucket_name}.s3-website-${data.aws_region.currentUser.region}.amazonaws.com"
 }
 
 provider "aws" {
@@ -33,6 +39,9 @@ module "document_s3_bucket" {
   source                  = "../../modules/s3"
   document_s3_bucket_name = "${var.document_s3_bucket_name}${local.env_suffix}"
   document_retention_days = var.document_retention_days
+
+  document_bucket_cors_allow_origins = ["http://localhost:3000", local.site_origin]
+  cors_max_age_seconds               = var.cors_max_age_seconds
 }
 
 module "customer_metadata_dynamo_db_table" {
@@ -103,6 +112,12 @@ module "document_lambda" {
   compare_details_lambda_cloudwatch_logs_policy_name = "${var.compare_details_lambda_cloudwatch_logs_policy_name}${local.env_suffix}"
   compare_details_lambda_policy_name                 = "${var.compare_details_lambda_policy_name}${local.env_suffix}"
 
+  #App API Lambda (browser-facing, not part of the document pipeline)
+  app_api_lambda_function_name               = "${var.app_api_lambda_function_name}${local.env_suffix}"
+  app_api_lambda_function_role_name          = "${var.app_api_lambda_function_role_name}${local.env_suffix}"
+  app_api_lambda_cloudwatch_logs_policy_name = "${var.app_api_lambda_cloudwatch_logs_policy_name}${local.env_suffix}"
+  app_api_lambda_policy_name                 = "${var.app_api_lambda_policy_name}${local.env_suffix}"
+
   #External
   document_s3_bucket_arn                         = module.document_s3_bucket.document_bucket_arn
   document_s3_bucket_name                        = module.document_s3_bucket.document_bucket_name
@@ -130,6 +145,13 @@ module "api_gateway" {
   #External
   validate_lambda_function_name = "${var.validate_lambda_function_name}${local.env_suffix}"
   validate_lambda_invoke_arn    = module.document_lambda.validation_lambda_invoke_arn
+  app_api_invoke_arn            = module.document_lambda.app_api_lambda_invoke_arn
+  app_api_lambda_function_name  = module.document_lambda.app_api_lambda_function_name
+
+  cognito_user_pool_client_id = module.congito.user_pool_client_id
+  cognito_issuer              = module.congito.issuer
+  api_cors_allow_origins      = ["http://localhost:3000", local.site_origin]
+  cors_max_age_seconds        = var.cors_max_age_seconds
 }
 
 module "sqs" {
@@ -171,4 +193,48 @@ module "congito" {
   source                        = "../../modules/cognito"
   cognito_user_pool_name        = "${var.cognito_user_pool_name}${local.env_suffix}"
   cognito_user_pool_client_name = "${var.cognito_user_pool_client_name}${local.env_suffix}"
+  seed_users                    = var.seed_users
+}
+
+module "site_bucket" {
+  source = "../../modules/s3Site"
+
+  site_bucket_name = local.site_bucket_name #already has name + env suffix in locals
+}
+
+
+#FRONTEND PROVISIONING /.env.local -> Creating env variables preparing for build
+resource "local_file" "frontend_env" {
+  filename = "${path.root}/../../../frontend/.env.local"
+
+  content = <<-ENV
+    NEXT_PUBLIC_USER_POOL_ID=${module.congito.user_pool_id}
+    NEXT_PUBLIC_USER_POOL_CLIENT_ID=${module.congito.user_pool_client_id}
+    NEXT_PUBLIC_API_BASE=${module.api_gateway.api_invoke_url}
+  ENV
+}
+
+resource "terraform_data" "site_deploy" {
+  #re runs when there is a change in the bucket or when there are any changes
+  # in the front end. You need the hash so editing anything it knows it needs to add whats new
+  triggers_replace = [
+    local.site_bucket_name,
+    sha1(join("", [
+      for f in fileset("${path.root}/../../../frontend", "{app,components,lib,public}/**") :
+      filesha1("${path.root}/../../../frontend/${f}")
+    ])),
+    filesha1("${path.root}/../../../frontend/next.config.ts"),
+  ]
+
+  provisioner "local-exec" {
+    working_dir = "${path.root}/../../../frontend"
+
+    # Builds the site and copies out/ to the bucket. sync sets the right Content-Type
+    # per file (aws_s3_object would tag them all binary/octet-stream and the CSS
+    # stops loading), and --delete clears out files from older builds.
+    command = "bun run build && aws s3 sync out/ s3://${local.site_bucket_name}/ --delete"
+  }
+
+  #the build reads .env.local so it has to exist first, and the sync needs a bucket to target
+  depends_on = [local_file.frontend_env, module.site_bucket]
 }

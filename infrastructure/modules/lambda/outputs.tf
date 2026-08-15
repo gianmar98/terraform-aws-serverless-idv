@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Giancarlo Martinez
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 
 # Lambda IAM -------------------------------------------------------------------------
 output "document_lambda_role_arn" {
@@ -62,4 +62,14 @@ output "compare_details_lambda_function_arn" {
 output "compare_details_lambda_function_name" {
   description = "This is the name of the 2nd lambda function of the Step Function"
   value       = aws_lambda_function.compare_details_lambda_function.function_name
+}
+
+# OUTPUT FOR THE BROWSER-FACING APP API LAMBDA
+output "app_api_lambda_invoke_arn" {
+  description = "Invoke ARN of the app API lambda function, for the API Gateway AWS_PROXY integration"
+  value       = aws_lambda_function.app_api_lambda_function.invoke_arn
+}
+output "app_api_lambda_function_name" {
+  description = "Name of the app API lambda function, for the API Gateway lambda permission"
+  value       = aws_lambda_function.app_api_lambda_function.function_name
 }

@@ -1,6 +1,7 @@
 import boto3
 import os
 import csv
+from datetime import datetime
 
 #S3
 s3 = boto3.client('s3')
@@ -40,12 +41,41 @@ def textract_response(bucket, license_key):
 
     return id_fields
 
+# The two sides of the comparison are written by different authors: the CSV is typed by a
+# human (or a web form), the other side is Textract reading the printed licence. They agree
+# on the facts and disagree on the formatting - a licence prints "NICK" and "01/12/1957"
+# where a form submits "Nick" and "1957-01-12". Comparing raw strings rejects a correct
+# applicant, so normalize both sides before comparing.
+DATE_FIELDS = {'DATE_OF_BIRTH'}
+DATE_FORMATS = ('%Y-%m-%d', '%m/%d/%Y')  # form order, then licence order
+
+
+def normalize(field, value):
+    "Reduce a field to a form that survives case, padding, and date-format differences."
+    text = (value or '').strip().upper()
+
+    if field in DATE_FIELDS:
+        for date_format in DATE_FORMATS:
+            try:
+                return datetime.strptime(text, date_format).strftime('%Y-%m-%d')
+            except ValueError:
+                continue
+        # Unparseable: fall through and compare as text, so a garbage date still fails
+        # rather than silently matching another garbage date.
+
+    return text
+
+
 def compare_dictionaries(app_uuid, details_dict, textract_dict):
     "Compare the CSV-supplied details against the Textract-extracted license fields"
     # added: this whole function was missing. Extracting license text is pointless unless we verify it matches what the customer submitted in the CSV.
-    csv_subset = {k: details_dict.get(k, '') for k in REQUIRED_FIELDS}       # added: narrow both sides to the same key set so the equality check is apples-to-apples (the CSV may carry extra columns).
-    textract_subset = {k: textract_dict.get(k, '') for k in REQUIRED_FIELDS} # added: .get(..., '') avoids a KeyError when Textract fails to read a field.
+    csv_subset = {k: normalize(k, details_dict.get(k, '')) for k in REQUIRED_FIELDS}       # added: narrow both sides to the same key set so the equality check is apples-to-apples (the CSV may carry extra columns).
+    textract_subset = {k: normalize(k, textract_dict.get(k, '')) for k in REQUIRED_FIELDS} # added: .get(..., '') avoids a KeyError when Textract fails to read a field.
     comparison = csv_subset == textract_subset                              # added: dict equality compares every required field at once.
+
+    if not comparison:  # name the fields that differ - a bare False is undebuggable in CloudWatch
+        print('Detail mismatch:', {k: (csv_subset[k], textract_subset[k])
+                                   for k in REQUIRED_FIELDS if csv_subset[k] != textract_subset[k]})
 
     table.update_item(                                                       # added: persist the result so downstream consumers can read LICENSE_DETAILS_MATCH, mirroring how compare_faces records LICENSE_SELFIE_MATCH.
         Key={'APP_UUID': app_uuid},

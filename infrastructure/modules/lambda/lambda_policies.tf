@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Giancarlo Martinez
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 
 locals {
   log_group_name        = "/aws/lambda/${var.document_lambda_function_name}"
@@ -29,6 +29,10 @@ locals {
   compare_details_log_group_name        = "/aws/lambda/${var.compare_details_lambda_function_name}"
   compare_details_logs_group_create_arn = "arn:aws:logs:${var.current_region}:${var.current_account_id}:*"
   compare_details_log_stream_arn_prefix = "arn:aws:logs:${var.current_region}:${var.current_account_id}:log-group:${local.compare_details_log_group_name}:*"
+
+  app_api_log_group_name        = "/aws/lambda/${var.app_api_lambda_function_name}"
+  app_api_logs_group_create_arn = "arn:aws:logs:${var.current_region}:${var.current_account_id}:*"
+  app_api_log_stream_arn_prefix = "arn:aws:logs:${var.current_region}:${var.current_account_id}:log-group:${local.app_api_log_group_name}:*"
 }
 
 #DOCUMENT LAMBDA ROLE -------------------------------------------------------
@@ -776,5 +780,101 @@ resource "aws_iam_role_policy" "compare_details_lambda_policy" { # what the iden
 resource "aws_iam_role_policy_attachment" "attach_textract_to_compare_details_lambda" {
   policy_arn = aws_iam_policy.textract_policy.arn
   role       = aws_iam_role.compare_details_lambda_role.name
+}
+#------------------------------------------------------------------------------
+
+#APP API LAMBDA ROLE ----------------------------------------------------------
+resource "aws_iam_role" "app_api_lambda_role" { #the identity (Lambda) itself, with the role attached
+  name = var.app_api_lambda_function_role_name
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Sid    = "AppApiLambdaRole"
+        Principal = { #Trusted entity type (Lambda)
+          Service = "lambda.amazonaws.com"
+        }
+      },
+    ]
+  })
+}
+#INLINE S3 & KMS & DYNAMODB POLICY
+resource "aws_iam_role_policy" "app_api_lambda_policy" { # what the identity is allowed to do
+  role = aws_iam_role.app_api_lambda_role.id
+  name = var.app_api_lambda_policy_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      { # A presigned URL is signed with THIS role's credentials, so the browser's upload is
+        # authorized against this statement - not against the browser. Scoped to zipped/
+        # because that is the only prefix the handler ever builds a key for.
+        Sid    = "S3AccessPolicy"
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject"
+        ],
+        Resource = "${var.document_s3_bucket_arn}/zipped/*"
+      },
+      { # Required alongside the S3 statement - the bucket is SSE-KMS, so without this the
+        # upload fails as AccessDenied on the S3 call. GenerateDataKey only: this function
+        # never READS an object, and a presigned single PUT is not a multipart upload.
+        # Add kms:Decrypt the day presigned uploads become multipart.
+        Sid    = "KMSAccessPolicy"
+        Effect = "Allow"
+        Action = [
+          "kms:GenerateDataKey"
+        ],
+        Resource = var.document_kms_key_arn
+      },
+      { # Status polling only - the pipeline owns every write to this table.
+        Sid    = "DynamoDBAccessPolicy"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:GetItem"
+        ],
+        Resource = var.dynamodb_metadata_table_arn
+      }
+    ]
+  })
+}
+#MANAGED CLOUDWATCH POLICY
+resource "aws_iam_policy" "app_api_lambda_cloudwatch_logs_policy" {
+  name = var.app_api_lambda_cloudwatch_logs_policy_name
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      { # Create Log Group
+        Sid    = "CloudWatchLogGroupCreation"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+        ]
+        Resource = local.app_api_logs_group_create_arn
+      },
+
+      { # Resource is scoped to this Lambda's own log group
+        Sid    = "CloudWatchLogsStreamAndPut"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = local.app_api_log_stream_arn_prefix
+      }
+    ]
+  })
+}
+resource "aws_iam_role_policy_attachment" "attach_CloudWatchPolicy_to_appApiLambdaRole" {
+  policy_arn = aws_iam_policy.app_api_lambda_cloudwatch_logs_policy.arn
+  role       = aws_iam_role.app_api_lambda_role.name
+}
+resource "aws_cloudwatch_log_group" "app_api_lambda_logs" {
+  name              = local.app_api_log_group_name
+  retention_in_days = 14
 }
 #------------------------------------------------------------------------------

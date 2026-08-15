@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Giancarlo Martinez
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 
 # KMS ---------------------------------------------------------------------------------
 # Customer managed key for the document bucket. The bucket holds PII (selfies, driver's
@@ -22,9 +22,9 @@ resource "aws_kms_key" "document_key" {
 
   # Deleting this key permanently destroys every object still encrypted with it - there is
   # no recovery path. 
-  lifecycle {
-    prevent_destroy = true
-  }
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 
   # No explicit policy: the default key policy grants the account root kms:*, which is what
   # allows the Lambda roles' IAM policies (step 5) to grant key access. Writing a custom key

@@ -1,5 +1,5 @@
 # Copyright (c) 2026 Giancarlo Martinez
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: Apache-2.0
 
 # Project-wide ----------------------------------------------------------------------
 variable "project_region" {
@@ -189,6 +189,24 @@ variable "compare_details_lambda_policy_name" {
   type        = string
 }
 
+#APP API lambda function
+variable "app_api_lambda_function_name" {
+  description = "Name of the browser-facing app API lambda function. Not part of the document pipeline."
+  type        = string
+}
+variable "app_api_lambda_function_role_name" {
+  description = "Name of the role for the lambda function serving the browser's upload-url and status calls"
+  type        = string
+}
+variable "app_api_lambda_cloudwatch_logs_policy_name" {
+  description = "name of the cloudwatch logs policy for the app API lambda function"
+  type        = string
+}
+variable "app_api_lambda_policy_name" {
+  description = "Name of the inline policy attached to the Lambda execution role"
+  type        = string
+}
+
 # DynamoDB ---------------------------------------------------------------------------
 variable "customer_metadata_dynamo_db_table_name" {
   description = "Name of the customer metadata DynamoDB table"
@@ -298,4 +316,28 @@ variable "cognito_user_pool_name" {
 variable "cognito_user_pool_client_name" {
   description = "This is the name of the authentication user pool from cognito"
   type        = string
+}
+variable "seed_users" {
+  description = "Demo logins for the dev Cognito pool, as email => password."
+  type        = map(string)
+  sensitive   = true
+}
+
+
+# CORS -------------
+variable "cors_max_age_seconds" {
+  description = "How long a browser may cache the CORS preflight (OPTIONS) response. Shared by the document bucket and the HTTP API."
+  type        = number
+}
+
+#S3 Site Hosting Bucket
+variable "site_bucket_name" {
+  description = "This is the name of the bucket that will host your web app"
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.site_bucket_name))
+    error_message = "Bucket name must be 3-63 characters: lowercase letters, digits, dots or hyphens, starting and ending alphanumeric."
+  }
+
 }
