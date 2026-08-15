@@ -4,7 +4,7 @@ import type {ReactNode} from "react";
 import {useEffect, useRef, useState} from "react";
 import {useRouter} from "next/navigation";
 import {signOut} from "aws-amplify/auth";
-import {LICENSE_FIELDS, type LicenseDetails, type StatusResponse} from "@/lib/types";
+import {LICENSE_FIELDS, type LicenseDetails, type LicenseField, type StatusResponse} from "@/lib/types";
 import { requestUploadUrl, uploadZip, fetchStatus} from "@/lib/api";
 import {buildSubmissionZip} from "@/lib/zip";
 import {DobPicker} from "@/components/DobPicker";
@@ -29,6 +29,11 @@ const mb = (b: number) => (b / 1024 / 1024).toFixed(1);
 // floor). Anything lighter looks refined in a mockup and fails WCAG AA in practice.
 const fieldLabel = "mb-1.5 block font-mono text-[11px] uppercase tracking-[0.14em] text-ink/65";
 
+// LICENSE_FIELDS are SCREAMING_SNAKE (they're CSV column names); this is how they read to a
+// human. Used by the field labels, the test-case rows, and the missing-fields error, so the
+// three never drift apart.
+const pretty = (field: string) => field.replaceAll("_", " ").toLowerCase();
+
 // One input treatment reused by every text field so the grid stays visually even. h-10 keeps
 // the 40px rhythm and clears the 44px-with-label touch target.
 // border-ink/50, not border-line: `line` (#C9D2DD) is only 1.53:1 against white, which is fine
@@ -46,7 +51,7 @@ const fieldInput =
 const alertBox =
   "mt-4 rounded-md border-l-2 border-fail bg-fail/[0.07] px-3 py-2 text-sm text-fail";
 
-// Shared by the two header buttons (Demo data, Sign Out) so they read as one control pair.
+// Shared by the two header buttons (Test cases, Sign Out) so they read as one control pair.
 const headerButton =
   "shrink-0 cursor-pointer rounded-md border border-line bg-surface px-3 py-1.5 text-sm " +
   "font-medium text-ink/70 transition-colors duration-200 hover:border-ink/25 hover:text-ink";
@@ -67,8 +72,9 @@ function SectionLabel({children}: {children: ReactNode}) {
   );
 }
 
-// Mock data matching the sample licence in TestZipUpload/8d247914_license.png, so submitting
-// the form as-is (with that licence + selfie) produces a PASS.
+// Mock data matching the sample licence in TestZipUpload/8d247914_license.png. Two jobs: it's
+// the placeholder text in every field (a hint at the shape of the answer, never submitted),
+// and it's test case 1's payload below.
 // Written in normal casing on purpose: the licence prints "NICK SAMPLE" in all-caps, and
 // compare_details_lambda.py normalizes both sides (upper + date parsing) before comparing.
 // If this ever stops matching, that normalizer is the thing that broke.
@@ -83,9 +89,60 @@ const MOCK: LicenseDetails = {
   ZIP_CODE_IN_ADDRESS: "000001234",
 };
 
+// The form starts genuinely empty so MOCK shows through as grey placeholder hints. A value
+// only enters state when the user types it or loads a test case - so what reads as ink on the
+// screen is exactly what gets written to the CSV, and a hint can never be submitted by accident.
+const EMPTY = Object.fromEntries(LICENSE_FIELDS.map((f) => [f, ""])) as LicenseDetails;
+
+// The three fixtures in TestZipUpload/, as one-click scenarios. All three carry the SAME
+// licence image (public/demo_license.png, printed NICK SAMPLE / S123456579010 / 01-12-1957),
+// so the only things that vary are the CSV and which selfie goes with it - which is exactly
+// what makes them a clean set: one variable moves per case.
+// `wrong` lists the fields that disagree with the printed licence, so the popover can mark
+// them instead of making the reader diff two documents by eye.
+type Scenario = {
+  id: string;
+  tab: string;
+  expect: string;
+  blurb: string;
+  details: LicenseDetails;
+  selfie: string;
+  wrong: LicenseField[];
+};
+
+const SCENARIOS: Scenario[] = [
+  {
+    id: "8d247914",
+    tab: "1 · Clean",
+    expect: "Expect: all three pass",
+    blurb: "Details match the printed licence and the selfie is the same face. These are also the values the empty form hints at as placeholders.",
+    details: MOCK,
+    selfie: "/demo_selfie.png",
+    wrong: [],
+  },
+  {
+    id: "9c358026",
+    tab: "2 · Face",
+    expect: "Expect: selfie fail",
+    blurb: "Identical details, but the selfie is a different person. CompareFaces raises on a non-match, which fails the state machine - so the other two flags may never be written at all.",
+    details: MOCK,
+    selfie: "/demo_selfie_other.png",
+    wrong: [],
+  },
+  {
+    id: "7a135804",
+    tab: "3 · Details",
+    expect: "Expect: details fail",
+    blurb: "Right face, wrong paperwork: the surname reads John where the licence prints Sample, and the ZIP has lost its leading zeros. The date is written 1/12/1957 in this fixture and still passes - the comparison parses dates rather than string-matching them.",
+    details: {...MOCK, LAST_NAME: "John", ZIP_CODE_IN_ADDRESS: "1234"},
+    selfie: "/demo_selfie.png",
+    wrong: ["LAST_NAME", "ZIP_CODE_IN_ADDRESS"],
+  },
+];
+
 export default function SubmitPanel(){
   const router = useRouter();
-  const [details, setDetails] = useState<LicenseDetails>(MOCK);
+  const [details, setDetails] = useState<LicenseDetails>(EMPTY);
   const [license, setLicense] = useState<File | null>(null);
   const [selfie, setSelfie] = useState<File | null>(null);
   const [uuid, setUuid] = useState<string | null>(null);
@@ -94,6 +151,47 @@ export default function SubmitPanel(){
   const [busy, setBusy] = useState(false);
   // Which demo field was just copied, so that one row can confirm itself for a moment.
   const [copiedField, setCopiedField] = useState<string | null>(null);
+  const [scenarioId, setScenarioId] = useState(SCENARIOS[0].id);
+  const [loadingCase, setLoadingCase] = useState(false);
+  // Controlled so loading a case can close the popover - the filled form behind it is the
+  // confirmation, and leaving the panel open on top of it hides the thing that just changed.
+  const [casesOpen, setCasesOpen] = useState(false);
+  const scenario = SCENARIOS.find((s) => s.id === scenarioId) ?? SCENARIOS[0];
+
+  // The fixtures ship in public/, so this is a same-origin fetch of a static file - it works
+  // under `bun dev` and from the S3 website endpoint alike. buildSubmissionZip renames both
+  // files to <uuid>_license.png / <uuid>_selfie.png, so the name given here is cosmetic.
+  async function fileFrom(path: string) {
+    const res = await fetch(path);
+    // Without this a 404 still resolves: res.blob() happily wraps the error page, and the zip
+    // ships an HTML document named *.png. The upload succeeds, Rekognition fails deep in the
+    // pipeline, and the browser shows an unexplained FAIL minutes later.
+    if (!res.ok) throw new Error(`Could not load ${path} (${res.status})`);
+    return new File([await res.blob()], path.slice(1), {type: "image/png"});
+  }
+
+  // One click fills the whole form: eight fields plus both images. Any previous run is cleared
+  // as well, so a stale verdict card can't sit next to freshly loaded data.
+  async function loadScenario() {
+    setLoadingCase(true);
+    setError(null);
+    try {
+      const [licenseFile, selfieFile] = await Promise.all([
+        fileFrom("/demo_license.png"),
+        fileFrom(scenario.selfie),
+      ]);
+      setDetails(scenario.details);
+      setLicense(licenseFile);
+      setSelfie(selfieFile);
+      setStatus(null);
+      setUuid(null); // also stops the polling effect from the previous submission
+      setCasesOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingCase(false);
+    }
+  }
 
   async function copyField(field: string, value: string) {
     // await navigator.clipboard.writeText(value);
@@ -156,6 +254,19 @@ export default function SubmitPanel(){
   const tooBig = totalBytes > MAX_ZIP_BYTES;
 
   async function handleSubmit(){
+    // Load-bearing now that the form starts empty: without it an untouched Submit uploads a
+    // CSV of blank strings, burns a real pipeline run, and comes back FAIL looking like a
+    // backend fault. Named fields rather than a generic "fill everything in" so the fix is
+    // one glance - unless nothing is filled at all, where listing all eight is just noise.
+    const missing = LICENSE_FIELDS.filter((f) => !details[f].trim());
+    if (missing.length){
+      setError(
+        missing.length === LICENSE_FIELDS.length
+          ? "Fill in the applicant details, or load a test case from the header."
+          : `Missing: ${missing.map(pretty).join(", ")}.`
+      );
+      return;
+    }
     if (!license || !selfie){
       setError("Pick both a license image and a selfie.");
       return;
@@ -188,47 +299,106 @@ export default function SubmitPanel(){
           </p>
         </div>
         <div className={"flex shrink-0 items-center gap-2"}>
-          {/* Everything a tester needs to try the happy path: the exact values the form is
-              prefilled with (click a row to copy one back if you edit it), and the two sample
-              documents they must upload. These are the real 8d247914 fixtures, so submitting
-              them unchanged produces three PASS flags. */}
-          <Popover>
-            <PopoverTrigger className={headerButton}>Demo data</PopoverTrigger>
-            <PopoverContent align={"end"} className={"w-80 bg-surface text-ink ring-ink/10"}>
+          {/* The three real fixtures from TestZipUpload/, each one click away from being loaded
+              into the form. Replaces the old single "Demo data" panel: that one only ever
+              described the happy path, and the two failure modes are the interesting half of
+              this pipeline. Rows still copy on click for anyone editing a value by hand. */}
+          <Popover open={casesOpen} onOpenChange={setCasesOpen}>
+            <PopoverTrigger className={headerButton}>Test cases</PopoverTrigger>
+            <PopoverContent align={"end"} className={"w-[22rem] bg-surface text-ink ring-ink/10"}>
               <p className={"font-mono text-[10px] uppercase tracking-[0.2em] text-ink/65"}>
-                Demo test data
+                Test cases (Copy paste + download/upload pictures manually, or auto load a case)
               </p>
-              <p className={"text-[13px] leading-5 text-ink/65"}>
-                Already filled in below. Click a field to copy it.
-              </p>
-              <div className={"flex flex-col overflow-hidden rounded-md border border-line"}>
-                {Object.entries(MOCK).map(([field, value]) => (
+              {/* aria-pressed carries the selection for screen readers; the visual cue is an
+                  inverted fill (luminance, not hue) so it survives colour-blindness too. */}
+              <div role={"group"} aria-label={"Test case"} className={"flex gap-1 rounded-md border border-line p-1"}>
+                {SCENARIOS.map((s) => (
                   <button
-                    key={field}
+                    key={s.id}
                     type={"button"}
-                    onClick={() => copyField(field, value)}
+                    onClick={() => setScenarioId(s.id)}
+                    aria-pressed={s.id === scenarioId}
                     className={
-                      "flex items-center justify-between gap-3 border-b border-line/70 px-2.5 py-1.5 " +
-                      "text-left transition-colors duration-200 last:border-b-0 hover:bg-thread/[0.06]"
+                      "flex-1 cursor-pointer rounded px-2 py-2 font-mono text-[10px] uppercase " +
+                      "tracking-[0.12em] transition-colors duration-200 " +
+                      (s.id === scenarioId
+                        ? "bg-ink text-paper"
+                        : "text-ink/65 hover:bg-thread/[0.06] hover:text-ink")
                     }
                   >
-                    <span className={"font-mono text-[10px] uppercase tracking-[0.12em] text-ink/65"}>
-                      {field.replaceAll("_", " ").toLowerCase()}
-                    </span>
-                    {/* Swapping the value for "copied" keeps the confirmation off colour alone
-                        (WCAG 1.4.1) - a tick-plus-green would carry the same meaning twice. */}
-                    <span className={"font-mono text-[12px] text-ink"}>
-                      {copiedField === field ? "copied" : value}
-                    </span>
+                    {s.tab}
                   </button>
                 ))}
               </div>
+              <div>
+                <p className={"font-mono text-[10px] uppercase tracking-[0.16em] text-ink"}>
+                  {scenario.expect}
+                </p>
+                <p className={"mt-1 text-[13px] leading-5 text-ink/65"}>{scenario.blurb}</p>
+              </div>
+              <div className={"flex flex-col overflow-hidden rounded-md border border-line"}>
+                {Object.entries(scenario.details).map(([field, value]) => {
+                  const wrong = scenario.wrong.includes(field as LicenseField);
+                  return (
+                    <button
+                      key={field}
+                      type={"button"}
+                      onClick={() => copyField(field, value)}
+                      className={
+                        "flex items-center justify-between gap-3 border-b border-line/70 px-2.5 py-1.5 " +
+                        "text-left transition-colors duration-200 last:border-b-0 hover:bg-thread/[0.06] " +
+                        (wrong ? "border-l-2 border-l-fail" : "")
+                      }
+                    >
+                      <span className={"font-mono text-[10px] uppercase tracking-[0.12em] text-ink/65"}>
+                        {pretty(field)}
+                      </span>
+                      <span className={"flex items-center gap-1.5"}>
+                        {/* The left rule alone would be colour-only (WCAG 1.4.1), so the
+                            mismatch says so in words as well. */}
+                        {wrong && (
+                          <span className={"font-mono text-[9px] uppercase tracking-[0.1em] text-fail"}>
+                            ≠ licence
+                          </span>
+                        )}
+                        {/* Swapping the value for "copied" keeps the confirmation off colour alone
+                            (WCAG 1.4.1) - a tick-plus-green would carry the same meaning twice. */}
+                        <span className={"font-mono text-[12px] text-ink"}>
+                          {copiedField === field ? "copied" : value}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                type={"button"}
+                onClick={loadScenario}
+                disabled={loadingCase}
+                className={
+                  "h-10 w-full cursor-pointer rounded-md bg-ink text-sm font-medium text-paper " +
+                  "transition-colors duration-200 hover:bg-thread-strong " +
+                  "disabled:cursor-not-allowed disabled:opacity-45"
+                }
+              >
+                {loadingCase ? "Loading..." : "Load into form"}
+              </button>
+              {/* Kept for anyone testing the pickers by hand or uploading to S3 directly; the
+                  download names match the pipeline's <uuid>_*.png convention. */}
               <div className={"flex gap-2"}>
-                <a href={"/demo_license.png"} download={"demo_license.png"} className={downloadLink}>
-                  Licence
+                <a
+                  href={"/demo_license.png"}
+                  download={`${scenario.id}_license.png`}
+                  className={downloadLink}
+                >
+                  Download Licence
                 </a>
-                <a href={"/demo_selfie.png"} download={"demo_selfie.png"} className={downloadLink}>
-                  Selfie
+                <a
+                  href={scenario.selfie}
+                  download={`${scenario.id}_selfie.png`}
+                  className={downloadLink}
+                >
+                  Download Selfie
                 </a>
               </div>
             </PopoverContent>
@@ -252,9 +422,17 @@ export default function SubmitPanel(){
         <div className={"grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2"}>
           {LICENSE_FIELDS.filter((field) => field !== "DATE_OF_BIRTH").map((field) => (
             <label key={field} className={"block"}>
-              <span className={fieldLabel}>{field.replaceAll("_"," ").toLowerCase()}</span>
+              <span className={fieldLabel}>{pretty(field)}</span>
+              {/* Controlled `value` + a STATIC placeholder, which is the whole trick: the hint
+                  used to be `placeholder={details[field]}`, so the box was uncontrolled and
+                  never re-rendered from state - loading a test case changed `details` (and the
+                  CSV that gets submitted) while the field on screen sat there looking empty.
+                  Now the grey text is only ever MOCK, and anything in ink is real state.
+                  DobPicker below was already controlled, which is why the date was the one
+                  field that appeared to move. */}
               <input
-                placeholder={details[field]}
+                value={details[field]}
+                placeholder={MOCK[field]}
                 onChange={(e) => setDetails({...details, [field]:e.target.value})}
                 className={fieldInput}
               />
