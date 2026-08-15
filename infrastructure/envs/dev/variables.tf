@@ -329,3 +329,15 @@ variable "cors_max_age_seconds" {
   description = "How long a browser may cache the CORS preflight (OPTIONS) response. Shared by the document bucket and the HTTP API."
   type        = number
 }
+
+#S3 Site Hosting Bucket
+variable "site_bucket_name" {
+  description = "This is the name of the bucket that will host your web app"
+  type        = string
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$", var.site_bucket_name))
+    error_message = "Bucket name must be 3-63 characters: lowercase letters, digits, dots or hyphens, starting and ending alphanumeric."
+  }
+
+}

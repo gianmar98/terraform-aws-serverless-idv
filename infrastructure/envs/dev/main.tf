@@ -14,7 +14,9 @@ terraform {
 data "aws_caller_identity" "currentUser" {}
 data "aws_region" "currentUser" {}
 locals {
-  env_suffix = "-${var.project_environment}"
+  env_suffix       = "-${var.project_environment}"
+  site_bucket_name = "${var.site_bucket_name}${local.env_suffix}"
+  site_origin      = "http://${local.site_bucket_name}.s3-website-${data.aws_region.currentUser.region}.amazonaws.com"
 }
 
 provider "aws" {
@@ -34,7 +36,7 @@ module "document_s3_bucket" {
   document_s3_bucket_name = "${var.document_s3_bucket_name}${local.env_suffix}"
   document_retention_days = var.document_retention_days
 
-  document_bucket_cors_allow_origins = ["http://localhost:3000"]
+  document_bucket_cors_allow_origins = ["http://localhost:3000", local.site_origin]
   cors_max_age_seconds               = var.cors_max_age_seconds
 }
 
@@ -144,7 +146,7 @@ module "api_gateway" {
 
   cognito_user_pool_client_id = module.congito.user_pool_client_id
   cognito_issuer              = module.congito.issuer
-  api_cors_allow_origins      = ["http://localhost:3000"]
+  api_cors_allow_origins      = ["http://localhost:3000", local.site_origin]
   cors_max_age_seconds        = var.cors_max_age_seconds
 }
 
@@ -188,4 +190,10 @@ module "congito" {
   cognito_user_pool_name        = "${var.cognito_user_pool_name}${local.env_suffix}"
   cognito_user_pool_client_name = "${var.cognito_user_pool_client_name}${local.env_suffix}"
   seed_users                    = var.seed_users
+}
+
+module "site_bucket" {
+  source = "../../modules/s3Site"
+
+  site_bucket_name = local.site_bucket_name //already has name + env suffix in locals
 }

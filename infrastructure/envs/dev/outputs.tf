@@ -77,3 +77,18 @@ output "frontend_api_invoke_url" {
   description = "API base URL, no trailing slash -> NEXT_PUBLIC_API_BASE. Local dev only; in prod the app calls /api/* same-origin through CloudFront."
   value       = module.api_gateway.api_invoke_url
 }
+
+output "site_bucket_name" {
+  description = "Name/ID of the site bucket"
+  value       = module.site_bucket.site_bucket_name
+}
+
+output "site_website_endpoint" {
+  description = "Website endpoint host URL"
+  value       = module.site_bucket.site_website_endpoint
+}
+
+output "site_website_url" {
+  description = "Full URL of the s3 endpoint of the site"
+  value       = module.site_bucket.site_website_url
+}
