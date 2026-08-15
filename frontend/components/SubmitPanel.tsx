@@ -1,7 +1,7 @@
 "use client";
 
 import type {ReactNode} from "react";
-import {useEffect, useRef, useState} from "react";
+import {useEffect, useMemo, useRef, useState} from "react";
 import {useRouter} from "next/navigation";
 import {signOut} from "aws-amplify/auth";
 import {LICENSE_FIELDS, type LicenseDetails, type LicenseField, type StatusResponse} from "@/lib/types";
@@ -239,6 +239,10 @@ export default function SubmitPanel(){
         }
       }catch (e){ //show error of why it actually stopped
         setError(e instanceof Error ? e.message : String(e));
+        // The attempts cap above is unreachable when fetchStatus throws, so without this a
+        // failing endpoint polls every 3s forever. Keep retrying (a blip shouldn't end the
+        // run) but honour the same ~2 min ceiling.
+        if (attempts >= 40 && timer.current) clearInterval(timer.current);
       }
     }, 3000); //return the polling function every 3,000ms (3 sec)
     return () => { //cleanup func
@@ -274,6 +278,10 @@ export default function SubmitPanel(){
     setError(null);
     setBusy(true);
     setStatus(null);
+    // Also clear the id, not just the flags: if this submit throws before setUuid(id) below,
+    // the Result card is still keyed on the *previous* run and would show that run's verdict
+    // sitting under this run's error message.
+    setUuid(null);
     try{
       //  export interface UploadUrlResponse {uuid: string;url: string;key: string;}
       const {uuid: id, url} = await requestUploadUrl();//1) presigned URL
@@ -519,17 +527,48 @@ export default function SubmitPanel(){
 }
 
 function FilePick({label, file, onPick}: {label:string; file: File | null; onPick: (f:File) => void;}){
+    // Thumbnail straight off the File via createObjectURL - no read, no base64, no upload:
+    // the browser already has the bytes. Revoked on change/unmount or each new pick leaks
+    // the previous blob for the life of the document.
+    const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
+    useEffect(() => () => {if (preview) URL.revokeObjectURL(preview);}, [preview]);
+
+    // Native HTML5 drop. preventDefault on dragOver is what makes the label a drop target at
+    // all; without it the browser navigates to the file instead. A drop bypasses the input's
+    // accept="image/*", so the type check is here rather than left to the backend.
+    const [over, setOver] = useState(false);
+
     // Empty and filled are visually distinct states: dashed + muted while waiting, solid with a
     // teal check once a file is attached. Colour alone never carries the meaning - the border
     // style and the tick both change (WCAG 1.4.1).
     return(
-        <label className={
+        <label
+          onDragOver={(e) => {e.preventDefault(); setOver(true);}}
+          // dragleave also fires when the cursor crosses onto a child (the thumbnail, the
+          // labels), so an unconditional setOver(false) strobes the highlight. relatedTarget
+          // is what's being entered - null when the drag leaves the window entirely.
+          onDragLeave={(e) => {if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false);}}
+          onDrop={(e) => {
+            e.preventDefault();
+            setOver(false);
+            const dropped = e.dataTransfer.files[0];
+            if (dropped?.type.startsWith("image/")) onPick(dropped);
+          }}
+          className={
           "group flex min-h-[104px] cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 p-4 text-center transition-colors duration-200 " +
           "focus-within:ring-2 focus-within:ring-thread/40 focus-within:ring-offset-2 focus-within:ring-offset-surface " +
-          (file
+          (over
+            ? "border-solid border-thread bg-thread/10"
+            : file
             ? "border-solid border-thread/40 bg-thread/[0.04]"
             : "border-dashed border-line hover:border-ink/30 hover:bg-ink/[0.02]")
         }>
+          {/* alt="" on purpose: the img sits inside the <label>, so any alt text would be read
+              out as part of the file input's accessible name, ahead of the label and filename
+              that already say the same thing. max-w-full stops a wide image (a 6:1 crop at
+              max-h-24 is ~576px) from pushing the tile past its grid column. */}
+          {/* eslint-disable-next-line @next/next/no-img-element -- blob: URL, next/image can't optimize it */}
+          {preview && <img src={preview} alt="" className={"mb-1 max-h-24 w-auto max-w-full rounded-sm border border-line object-contain"}/>}
           <span className={"flex items-center gap-1.5 text-sm font-medium text-ink/80"}>
             {file && (
               <svg aria-hidden viewBox="0 0 16 16" className="h-3.5 w-3.5 text-thread" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round">
@@ -539,7 +578,7 @@ function FilePick({label, file, onPick}: {label:string; file: File | null; onPic
             {label}
           </span>
           <span className={"line-clamp-1 max-w-full break-all text-xs " + (file ? "text-ink/65" : "text-ink/65")}>
-            {file ? file.name : `Click to choose`}
+            {file ? file.name : `Click to choose or drop an image`}
           </span>
           <input
             type={"file"}
