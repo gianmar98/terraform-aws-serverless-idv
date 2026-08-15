@@ -68,16 +68,16 @@ resource "aws_cognito_user" "seed" {
   # Makes one user per email in seed_users. Terraform names each user after its email and
   # prints that name, so it can't be secret - nonsensitive() pulls out only the emails.
   # The passwords never pass through it, so they stay hidden.
-  for_each = nonsensitive(toset(keys(var.seed_users))) //"keys" are just the email addresses
+  for_each = nonsensitive(toset(keys(var.seed_users))) #"keys" are just the email addresses
 
 
-  user_pool_id = aws_cognito_user_pool.license_validation_users.id //which pool to put the users in
-  username     = each.key                                          //the pool sets username_attributes = ["email"], so username IS the email
-  password     = var.seed_users[each.key]                          //still secret - read straight from the map
+  user_pool_id = aws_cognito_user_pool.license_validation_users.id #which pool to put the users in
+  username     = each.key                                          #the pool sets username_attributes = ["email"], so username IS the email
+  password     = var.seed_users[each.key]                          #still secret - read straight from the map
 
   attributes = {
     email = each.key
-    //users we create here start unverified, so say it out loud (has to be the string "true")
+    #users we create here start unverified, so say it out loud (has to be the string "true")
     email_verified = "true"
   }
 

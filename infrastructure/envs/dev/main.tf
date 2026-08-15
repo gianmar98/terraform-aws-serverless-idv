@@ -8,6 +8,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 6.4"
     }
+    local = {
+      source  = "hashicorp/local"
+      version = "~> 2.5"
+    }
   }
 }
 
@@ -195,5 +199,42 @@ module "congito" {
 module "site_bucket" {
   source = "../../modules/s3Site"
 
-  site_bucket_name = local.site_bucket_name //already has name + env suffix in locals
+  site_bucket_name = local.site_bucket_name #already has name + env suffix in locals
+}
+
+
+#FRONTEND PROVISIONING /.env.local -> Creating env variables preparing for build
+resource "local_file" "frontend_env" {
+  filename = "${path.root}/../../../frontend/.env.local"
+
+  content = <<-ENV
+    NEXT_PUBLIC_USER_POOL_ID=${module.congito.user_pool_id}
+    NEXT_PUBLIC_USER_POOL_CLIENT_ID=${module.congito.user_pool_client_id}
+    NEXT_PUBLIC_API_BASE=${module.api_gateway.api_invoke_url}
+  ENV
+}
+
+resource "terraform_data" "site_deploy" {
+  #re runs when there is a change in the bucket or when there are any changes
+  # in the front end. You need the hash so editing anything it knows it needs to add whats new
+  triggers_replace = [
+    local.site_bucket_name,
+    sha1(join("", [
+      for f in fileset("${path.root}/../../../frontend", "{app,components,lib,public}/**") :
+      filesha1("${path.root}/../../../frontend/${f}")
+    ])),
+    filesha1("${path.root}/../../../frontend/next.config.ts"),
+  ]
+
+  provisioner "local-exec" {
+    working_dir = "${path.root}/../../../frontend"
+
+    # Builds the site and copies out/ to the bucket. sync sets the right Content-Type
+    # per file (aws_s3_object would tag them all binary/octet-stream and the CSS
+    # stops loading), and --delete clears out files from older builds.
+    command = "bun run build && aws s3 sync out/ s3://${local.site_bucket_name}/ --delete"
+  }
+
+  #the build reads .env.local so it has to exist first, and the sync needs a bucket to target
+  depends_on = [local_file.frontend_env, module.site_bucket]
 }

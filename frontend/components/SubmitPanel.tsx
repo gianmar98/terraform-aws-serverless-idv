@@ -96,7 +96,23 @@ export default function SubmitPanel(){
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   async function copyField(field: string, value: string) {
-    await navigator.clipboard.writeText(value);
+    // await navigator.clipboard.writeText(value);
+    // setCopiedField(field);
+    // setTimeout(() => setCopiedField(null), 1200);
+
+    //For S3, since endpoint is HTTP-only and navigator.clipboard does not exist
+    // out of a secure context. execCommand is deprecated but its what works for this scenario
+    // Is dropped once CloudFront puts the site on HTTPS
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(value);
+    } else {
+      const el = document.createElement("textarea");
+      el.value = value;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      el.remove();
+    }
     setCopiedField(field);
     setTimeout(() => setCopiedField(null), 1200);
   }

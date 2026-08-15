@@ -3,7 +3,7 @@
 
 resource "aws_s3_bucket" "site" {
   bucket = var.site_bucket_name
-  //full site will be generated with "bun run build" so its okay to destroy
+  #full site will be generated with "bun run build" so its okay to destroy
   force_destroy = true
 }
 
@@ -19,7 +19,7 @@ resource "aws_s3_bucket_website_configuration" "site" {
   }
 }
 
-//Public bucket to show site to public
+#Public bucket to show site to public
 resource "aws_s3_bucket_public_access_block" "site_public_access" {
   bucket = aws_s3_bucket.site.id
 
@@ -40,16 +40,16 @@ data "aws_iam_policy_document" "site_public_read" {
       identifiers = ["*"]
       type        = "*"
     }
-    //Website endpoint is HTTP, denying non-TLS requests here would deny every
-    // request on the site
+    #Website endpoint is HTTP, denying non-TLS requests here would deny every
+    # request on the site
   }
 }
 
-//attach get object policy on site bucket
+#attach get object policy on site bucket
 resource "aws_s3_bucket_policy" "site_public_read" {
   bucket = aws_s3_bucket.site.id
   policy = data.aws_iam_policy_document.site_public_read.json
 
-  //make sure its made after
+  #make sure its made after
   depends_on = [aws_s3_bucket_public_access_block.site_public_access]
 }

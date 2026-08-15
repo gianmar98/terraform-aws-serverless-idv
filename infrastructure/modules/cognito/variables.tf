@@ -8,9 +8,9 @@ variable "cognito_user_pool_client_name" {
   type        = string
 }
 
-//seed user passwords is redacted from output but is stored in plaintext in terraform.tfstate
-//users that sign up through cognito UI they will not appear on tfstate file
-//in prod, mark as "{}" the map variable
+#seed user passwords is redacted from output but is stored in plaintext in terraform.tfstate
+#users that sign up through cognito UI they will not appear on tfstate file
+#in prod, mark as "{}" the map variable
 variable "seed_users" {
   description = "List of user(s) that will be added at creation"
   type        = map(string)
