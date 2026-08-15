@@ -12,10 +12,22 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import {Popover, PopoverContent, PopoverTrigger} from "@/components/ui/popover"
 import {useRouter} from "next/navigation";
 
 //"mode" is a state machine: which form are we showing?
 type Mode = "login" | "signup" | "confirm"
+
+// Sign up isn't wired yet, so only the Terraform-seeded users can get in. Without this the
+// page is a locked door with no key next to it.
+// Must match a pair in `seed_users` in infrastructure/envs/dev/terraform.tfvars — those users
+// are created by aws_cognito_user.seed, and their passwords already sit in plaintext in
+// Terraform state, so printing one here changes nothing about the blast radius. Rotate the
+// seed password and this constant is the second place to change.
+const DEMO_LOGIN = {
+  email: "demo1@example.com",
+  password: "DemoPass123",
+};
 
 
 export function LoginForm({
@@ -34,6 +46,28 @@ export function LoginForm({
 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false); // true while a Cognito call is in flight
+
+  // Which demo row was just copied, so that one row can confirm itself for a moment.
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  // Same helper as SubmitPanel's demo popover, fallback included: the site is served from an
+  // S3 website endpoint over HTTP, and navigator.clipboard doesn't exist outside a secure
+  // context — without the else branch the button silently does nothing in production while
+  // working fine under `bun dev`. Both copies go once CloudFront puts the site on HTTPS.
+  async function copyField(field: string, value: string) {
+    if (navigator.clipboard) {
+      await navigator.clipboard.writeText(value);
+    } else {
+      const el = document.createElement("textarea");
+      el.value = value;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      el.remove();
+    }
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 1200);
+  }
 
   // All three handlers need the same busy/error bookkeeping around one Cognito call,
   // so it lives here once rather than being repeated in each of them.
@@ -132,6 +166,58 @@ export function LoginForm({
                   {busy ? "Logging in..." : "Login"}
                 </Button>
               </Field>
+              {/* Sits under the primary CTA on purpose: it's the answer to a question the
+                  reader has already asked ("...but I don't have an account"), and an outline
+                  mono control doesn't compete with the one filled button on the screen.
+                  Click-to-copy is the same gesture SubmitPanel's Demo data popover teaches. */}
+              <Popover>
+                <PopoverTrigger
+                  // Explicit: inside a <form>, a button with no type submits it, so the
+                  // trigger would fire an empty login and render an error under the popover.
+                  type="button"
+                  className={
+                    "mx-auto cursor-pointer rounded-md border border-ink/50 px-3 py-1.5 font-mono " +
+                    "text-[11px] uppercase tracking-[0.12em] text-ink/70 transition-colors duration-200 " +
+                    "hover:border-ink/70 hover:text-ink"
+                  }
+                >
+                  Get test credentials
+                </PopoverTrigger>
+                <PopoverContent align="center" className="w-80 bg-surface text-ink ring-ink/10">
+                  <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink/65">
+                    Demo account
+                  </p>
+                  <p className="text-[13px] leading-5 text-ink/65">
+                    Sign up isn&apos;t wired yet. Click a field to copy it.
+                  </p>
+                  {/* border-line is fine here (a decorative panel edge and row dividers) but
+                      never on a control — it's 1.53:1 on paper and fails WCAG 1.4.11. The
+                      trigger above uses border-ink/50 for exactly that reason. */}
+                  <div className="flex flex-col overflow-hidden rounded-md border border-line">
+                    {Object.entries(DEMO_LOGIN).map(([field, value]) => (
+                      <button
+                        key={field}
+                        type="button"
+                        onClick={() => copyField(field, value)}
+                        aria-label={`Copy demo ${field}`} // visible text is the value, not the action
+                        className={
+                          "flex items-center justify-between gap-3 border-b border-line/70 px-2.5 py-1.5 " +
+                          "text-left transition-colors duration-200 last:border-b-0 hover:bg-thread/[0.06]"
+                        }
+                      >
+                        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink/65">
+                          {field}
+                        </span>
+                        {/* Swapping the value for "copied" keeps the confirmation off colour
+                            alone (WCAG 1.4.1) — a green tick would say it twice in one channel. */}
+                        <span className="font-mono text-[12px] text-ink">
+                          {copiedField === field ? "copied" : value}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
               {/* The Apple/Google/Meta buttons and their "Or continue with" separator that
                   ship with shadcn's login-04 block were removed: no federated IdPs are
                   configured in Cognito, so they were three controls that looked interactive
