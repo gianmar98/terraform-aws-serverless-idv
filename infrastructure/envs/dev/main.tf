@@ -202,6 +202,13 @@ module "site_bucket" {
   site_bucket_name = local.site_bucket_name #already has name + env suffix in locals
 }
 
+module "cloudfront_origin" {
+  source                           = "../../modules/cloudfront"
+  site_bucket_name                 = module.site_bucket.site_bucket_name
+  site_bucket_arn                  = module.site_bucket.site_bucket_arn
+  site_bucket_regional_domain_name = module.site_bucket.site_bucket_regional_domain_name
+}
+
 
 #FRONTEND PROVISIONING /.env.local -> Creating env variables preparing for build
 resource "local_file" "frontend_env" {

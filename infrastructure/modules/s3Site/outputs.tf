@@ -15,3 +15,13 @@ output "site_website_url" {
   description = "Full URL of the s3 endpoint of the site"
   value       = "http://${aws_s3_bucket_website_configuration.site.website_endpoint}"
 }
+
+output "site_bucket_arn" {
+  description = "ARN of bucket that hosts the site"
+  value       = aws_s3_bucket.site.arn
+}
+
+output "site_bucket_regional_domain_name" {
+  description = "regional domain name of bucket that hosts the site"
+  value       = aws_s3_bucket.site.bucket_regional_domain_name
+}
