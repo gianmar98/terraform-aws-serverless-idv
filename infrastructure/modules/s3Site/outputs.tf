@@ -6,15 +6,17 @@ output "site_bucket_name" {
   value       = aws_s3_bucket.site.id
 }
 
-output "site_website_endpoint" {
-  description = "Website endpoint host URL"
-  value       = aws_s3_bucket_website_configuration.site.website_endpoint
-}
+#Both dead now that the website config is gone. The site is reached at
+# module.cloudfront_origin.cloudfront_url instead
+# output "site_website_endpoint" {
+#   description = "Website endpoint host URL"
+#   value       = aws_s3_bucket_website_configuration.site.website_endpoint
+# }
 
-output "site_website_url" {
-  description = "Full URL of the s3 endpoint of the site"
-  value       = "http://${aws_s3_bucket_website_configuration.site.website_endpoint}"
-}
+# output "site_website_url" {
+#   description = "Full URL of the s3 endpoint of the site"
+#   value       = "http://${aws_s3_bucket_website_configuration.site.website_endpoint}"
+# }
 
 output "site_bucket_arn" {
   description = "ARN of bucket that hosts the site"

@@ -34,7 +34,7 @@ Provisions `ValidateLicenseApi`, one HTTP API serving **two unrelated audiences*
 | `app_api_lambda_function_name` | `string` | Function name of the app API Lambda — used by its invoke permission |
 | `cognito_user_pool_client_id` | `string` | Cognito app client ID — the JWT `audience` |
 | `cognito_issuer` | `string` | Cognito JWT issuer URL — the JWT `issuer` |
-| `api_cors_allow_origins` | `list(string)` | Allowed CORS origins. Passed inline from `envs/dev/main.tf` as `["http://localhost:3000", local.site_origin]`, not a tfvars dial — `local.site_origin` is the S3 website endpoint of `modules/s3Site`. The CloudFront domain joins the list once it exists |
+| `api_cors_allow_origins` | `list(string)` | Allowed CORS origins. Passed inline from `envs/dev/main.tf` as `["http://localhost:3000", local.site_origin]`, not a tfvars dial — `local.site_origin` now resolves to `module.cloudfront_origin.cloudfront_url`, so this list is "known after apply" on any plan that (re)creates the distribution |
  | `cors_max_age_seconds` | `number` | `cors_configuration.max_age` — how long a browser may cache the preflight. Set in `envs/dev/terraform.tfvars` (`300`) and shared with `modules/s3`'s document-bucket CORS rule, so changing it moves both |
 
 ## Outputs
@@ -45,7 +45,7 @@ Provisions `ValidateLicenseApi`, one HTTP API serving **two unrelated audiences*
 | `validate_license_api_name` | Name of the HTTP API — flows into the lambda module as the submit-license Lambda's `VALIDATE_LICENSE_API` env var |
 | `license_validation_invoke_url` | Invoke URL for `POST /license` — flows into the lambda module as the submit-license Lambda's `VALIDATE_LICENSE_API_URL` env var (the endpoint it POSTs to) |
 | `validate_license_api_execution_arn` | `execute-api` ARN — scope `execute-api:Invoke` against this, **not** the API's plain `arn` |
-| `api_endpoint_host` | API host with the scheme stripped, for use as a CloudFront origin `domain_name` (which rejects a full URL). Not consumed yet — §2.5 |
+| `api_endpoint_host` | API host with the scheme stripped, for use as a CloudFront origin `domain_name` (which rejects a full URL). **Dead output** — the OAC design that shipped in `modules/cloudfront` only origins the S3 site bucket, not the API, so nothing consumes this |
 | `api_invoke_url` | Base invoke URL of the `$default` stage, for the frontend's `NEXT_PUBLIC_API_BASE` in local dev. `trimsuffix`ed — the raw stage URL ends in `/` and `frontend/lib/api.ts` appends `/api/...` to it |
 
 ## Cross-module dependencies

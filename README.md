@@ -17,8 +17,11 @@ All resource names are stamped with `-${project_environment}` (e.g. `-dev`, `-pr
 - **Lambda** (`infrastructure/modules/lambda/`) — six deployed functions. Four (unzip → write-to-dynamo → compare-faces → compare-details) are the live pipeline, sequenced by Step Functions; they run face-match (Rekognition) and ID-field extraction (Textract) checks, record results in DynamoDB, and notify via SNS. A validation/submit-license pair backs the API Gateway + SQS validation hop. A seventh, the monolithic document Lambda that did all of the above in one handler, is **commented out** — superseded by the pipeline, source retained.
 - **Step Functions** (`infrastructure/modules/stepFunction/`) — `DocumentStateMachine`, plus the S3 → EventBridge → Step Functions chain that starts an execution on every `zipped/` upload. X-Ray tracing is enabled end to end; `WriteToDynamoLambdaFunction` is additionally instrumented with AWS Lambda Powertools, so its S3 and DynamoDB calls show as individual subsegments (CloudWatch → Application Signals → Traces).
 - **SNS** (`infrastructure/modules/sns/`) — `ApplicationNotifications` topic with email subscription.
-- **API Gateway** (`infrastructure/modules/apiGateway/`) — `ValidateLicenseApi`, HTTP API exposing `POST /license` (internal mock validator, not a browser-facing API). The route requires IAM auth, so the submit-license Lambda SigV4-signs its call.
+- **API Gateway** (`infrastructure/modules/apiGateway/`) — `ValidateLicenseApi`, one HTTP API serving two audiences: internal `POST /license` (IAM-signed, not browser-facing) and the browser-facing `POST /api/upload-url` + `GET /api/status/{uuid}` (Cognito JWT-authorized).
 - **SQS** (`infrastructure/modules/sqs/`) — `LicenseQueue` + dead-letter queue, carrying the state machine's final message to the submit-license Lambda.
+- **Cognito** (`infrastructure/modules/cognito/`) — user pool + public SPA app client backing the frontend's login; the JWT authorizer on the `/api/*` routes above trusts this pool.
+- **S3 site bucket** (`infrastructure/modules/s3Site/`) — private bucket holding the built Next.js frontend; not readable directly, it's the CloudFront origin below.
+- **CloudFront** (`infrastructure/modules/cloudfront/`) — HTTPS distribution in front of the site bucket via Origin Access Control (OAC), plus an edge function that resolves `/login` and `/login/` to the static export's `login/index.html`. This is the URL a new user opens to see the deployed frontend — see the `cloudfront_url` Terraform output.
 
 All resources deploy to `us-east-1`.
 
@@ -58,9 +61,23 @@ The other three pipeline Lambdas are untraced and appear as flat call targets �
 
 ## Prerequisites
 
+Everything below is required before a first `terraform apply` — Terraform won't tell you if one is missing, it'll just fail partway through.
+
 - Terraform `>= 1.10.0`
 - AWS CLI configured with credentials that can assume the deployment role
-- Access to the remote-state bucket `aci-capstone1-remote-state`
+- Access to the remote-state bucket `aci-capstone1-remote-state` — it's a one-time bootstrap bucket outside this config; `terraform init` needs it to already exist
+- [`bun`](https://bun.sh) installed and on `PATH` — the deploy step shells out to `bun run build` to compile the frontend before syncing it to S3
+- `infrastructure/envs/dev/terraform.tfvars` created locally — it's gitignored (contains environment-specific and sensitive values) and is **not** generated for you; copy the variable names from `infrastructure/envs/dev/variables.tf` and fill in real values. `seed_users` (demo Cognito logins) is required and `sensitive`.
+
+### First deploy
+
+```bash
+cd infrastructure/envs/dev
+terraform init
+terraform apply
+```
+
+One manual step after `apply` finishes: **confirm the SNS email subscription.** `terraform apply` triggers a confirmation email to `app_notification_email_endpoint` (set in `terraform.tfvars`); `ApplicationNotifications` won't deliver anything until you click the link. Nothing else needs manual intervention — one `apply` brings up all ten modules (including building and deploying the frontend), and one `terraform destroy` tears them back down, no console clicking required either direction. The deployed frontend's URL is the `cloudfront_url` output (`terraform output cloudfront_url`).
 
 ## Project Layout
 
@@ -120,15 +137,21 @@ The other three pipeline Lambdas are untraced and appear as flat call targets �
 │   │   │   ├── variables.tf
 │   │   │   ├── outputs.tf
 │   │   │   └── README.md
-│   │   └── s3Site/            # Public bucket + S3 static website hosting for the frontend
-│   │       ├── s3.tf           # bucket, website config, public access block, public-read policy
+│   │   ├── s3Site/             # Private bucket holding the built frontend — CloudFront's OAC origin, not a website host
+│   │   │   ├── s3.tf            # bucket + public access block (all four flags true)
+│   │   │   ├── variables.tf
+│   │   │   ├── outputs.tf
+│   │   │   └── README.md
+│   │   └── cloudfront/         # OAC distribution + edge rewrite function + site bucket policy, fronting s3Site over HTTPS
+│   │       ├── cloudfront.tf
+│   │       ├── rewrite_uri.js   # edge function: resolves /login and /login/ to login/index.html
 │   │       ├── variables.tf
 │   │       ├── outputs.tf
 │   │       └── README.md
 │   └── envs/
 │       └── dev/
 │           ├── backend.tf       # state at envs/dev/terraform.tfstate
-│           ├── main.tf          # composes all 9 sub-modules
+│           ├── main.tf          # composes all 10 sub-modules
 │           ├── variables.tf     # pass-through declarations
 │           ├── outputs.tf       # forwards each sub-module's outputs
 │           └── terraform.tfvars # gitignored

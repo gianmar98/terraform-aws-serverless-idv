@@ -20,7 +20,8 @@ data "aws_region" "currentUser" {}
 locals {
   env_suffix       = "-${var.project_environment}"
   site_bucket_name = "${var.site_bucket_name}${local.env_suffix}"
-  site_origin      = "http://${local.site_bucket_name}.s3-website-${data.aws_region.currentUser.region}.amazonaws.com"
+  # site_origin      = "http://${local.site_bucket_name}.s3-website-${data.aws_region.currentUser.region}.amazonaws.com"
+  site_origin = module.cloudfront_origin.cloudfront_url
 }
 
 provider "aws" {
@@ -40,6 +41,7 @@ module "document_s3_bucket" {
   document_s3_bucket_name = "${var.document_s3_bucket_name}${local.env_suffix}"
   document_retention_days = var.document_retention_days
 
+  #localhost stays so "bun dev" can still hit the real backend. The presigned URL is the lock here
   document_bucket_cors_allow_origins = ["http://localhost:3000", local.site_origin]
   cors_max_age_seconds               = var.cors_max_age_seconds
 }
@@ -150,8 +152,10 @@ module "api_gateway" {
 
   cognito_user_pool_client_id = module.congito.user_pool_client_id
   cognito_issuer              = module.congito.issuer
-  api_cors_allow_origins      = ["http://localhost:3000", local.site_origin]
-  cors_max_age_seconds        = var.cors_max_age_seconds
+  #localhost stays for "bun dev". The JWT authorizer is what guards these routes,
+  # CORS only decides which browser pages may call them
+  api_cors_allow_origins = ["http://localhost:3000", local.site_origin]
+  cors_max_age_seconds   = var.cors_max_age_seconds
 }
 
 module "sqs" {
@@ -239,7 +243,10 @@ resource "terraform_data" "site_deploy" {
     # Builds the site and copies out/ to the bucket. sync sets the right Content-Type
     # per file (aws_s3_object would tag them all binary/octet-stream and the CSS
     # stops loading), and --delete clears out files from older builds.
-    command = "bun run build && aws s3 sync out/ s3://${local.site_bucket_name}/ --delete"
+    command = "bun run build && aws s3 sync out/ s3://${local.site_bucket_name}/ --delete && aws cloudfront create-invalidation --distribution-id ${module.cloudfront_origin.cloudfront_distribution_id} --paths '/*'"
+    #It does a full cache invalidation, if not CloudFront will keep saving the previous bundle till TTL is over.
+    # NOTE: '/*' counts as 1 path against 1,000 free invalidation paths/mo.
+
   }
 
   #the build reads .env.local so it has to exist first, and the sync needs a bucket to target

@@ -83,12 +83,18 @@ output "site_bucket_name" {
   value       = module.site_bucket.site_bucket_name
 }
 
-output "site_website_endpoint" {
-  description = "Website endpoint host URL"
-  value       = module.site_bucket.site_website_endpoint
-}
+# REMOVED becuase the URL of access will be cloudfront
+# output "site_website_endpoint" {
+#   description = "Website endpoint host URL"
+#   value       = module.site_bucket.site_website_endpoint
+# }
 
-output "site_website_url" {
-  description = "Full URL of the s3 endpoint of the site"
-  value       = module.site_bucket.site_website_url
+# output "site_website_url" {
+#   description = "Full URL of the s3 endpoint of the site"
+#   value       = module.site_bucket.site_website_url
+# }
+
+output "cloudfront_url" {
+  description = "HTTPS (TLS) URL of the deployed site"
+  value       = module.cloudfront_origin.cloudfront_url
 }

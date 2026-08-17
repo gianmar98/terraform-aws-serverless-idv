@@ -135,6 +135,7 @@ variable "unzip_license_lambda_cloudwatch_logs_policy_name" {
 # WRITE TO DYNAMO lambda function
 variable "write_to_dynamo_lambda_function_name" {
   description = "Name of the lambda function that will write to the lambda function after receiving the app_uuid from the unzip lambda function"
+  type        = string
 }
 
 variable "write_to_dynamo_lambda_function_role_name" {
