@@ -4,9 +4,16 @@ AWS infrastructure for a serverless document-handling backend, provisioned entir
 
 ## Architecture
 
-![Serverless document-handling backend: S3 upload triggers EventBridge, which starts a Step Functions state machine orchestrating four Lambdas against Rekognition, Textract, DynamoDB and SQS](docs/Architecture.png?v=2)
+![Serverless license onboarding platform: CloudFront serves the Next.js SPA over HTTPS from a private S3 bucket via OAC; the browser signs in with Cognito, gets a presigned URL from the app API, and uploads an applicant zip to the document bucket, where EventBridge starts a Step Functions execution running four Lambdas against Rekognition, Textract, DynamoDB and SQS](docs/Architecture.png?v=3)
 
-Source: [`docs/aci-capstone1-serverless-backend.drawio`](docs/aci-capstone1-serverless-backend.drawio) — edit there and re-export, never edit the PNG. Conventions and layout rules for this diagram are documented in [`docs/draw_io.md`](docs/draw_io.md). Greyed boxes are commented out in Terraform and not deployed.
+Source: [`docs/aci-capstone1-serverless-backend.drawio`](docs/aci-capstone1-serverless-backend.drawio) — edit there and re-export, never edit the PNG. Conventions and layout rules for this diagram are documented in [`docs/draw_io.md`](docs/draw_io.md).
+
+The 16 numbered badges on the canvas match the numbered legend on the right: 1–4 the browser plane (load the app, sign in, request an upload URL, upload), 5–12 the document pipeline, 13–14 submit and validate, 15 the status poll, 16 failure notifications. Solid arrows are the happy path, dashed ones are failure or return paths.
+
+Greyed elements are **not** on the live request path, for two different reasons:
+
+- **Auxiliary band** — the monolithic `DocumentLambda` is commented out in Terraform, superseded by the Step Functions pipeline; its role, policies and log group still deploy.
+- **Custom domain band** — Route 53 + ACM are *not written at all*. Everything else in the diagram is deployed and proven end to end; the site simply answers on the distribution's default `*.cloudfront.net` name. That band documents what closing the gap would take.
 
 ## Stack
 
