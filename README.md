@@ -4,9 +4,9 @@ AWS infrastructure for a serverless document-handling backend, provisioned entir
 
 ## Architecture
 
-![Serverless license onboarding platform: CloudFront serves the Next.js SPA over HTTPS from a private S3 bucket via OAC; the browser signs in with Cognito, gets a presigned URL from the app API, and uploads an applicant zip to the document bucket, where EventBridge starts a Step Functions execution running four Lambdas against Rekognition, Textract, DynamoDB and SQS](docs/Architecture.png?v=3)
+![Serverless license onboarding platform: CloudFront serves the Next.js SPA over HTTPS from a private S3 bucket via OAC; the browser signs in with Cognito, gets a presigned URL from the app API, and uploads an applicant zip to the document bucket, where EventBridge starts a Step Functions execution running four Lambdas against Rekognition, Textract, DynamoDB and SQS](docs/Architecture.png?v=4)
 
-Source: [`docs/aci-capstone1-serverless-backend.drawio`](docs/aci-capstone1-serverless-backend.drawio) — edit there and re-export, never edit the PNG. Conventions and layout rules for this diagram are documented in [`docs/draw_io.md`](docs/draw_io.md).
+Source: [`docs/aci-capstone1-serverless-backend.drawio`](docs/aci-capstone1-serverless-backend.drawio) — edit there and re-export, never edit the PNG.
 
 The 16 numbered badges on the canvas match the numbered legend on the right: 1–4 the browser plane (load the app, sign in, request an upload URL, upload), 5–12 the document pipeline, 13–14 submit and validate, 15 the status poll, 16 failure notifications. Solid arrows are the happy path, dashed ones are failure or return paths.
 
@@ -21,7 +21,7 @@ All resource names are stamped with `-${project_environment}` (e.g. `-dev`, `-pr
 
 - **S3** (`infrastructure/modules/s3/`) — document storage bucket: TLS-only, encrypted with its own KMS customer managed key (SSE-KMS + bucket keys), with lifecycle rules expiring `zipped/`/`unzipped/` objects after 30 days. It holds PII — selfies and driver's licenses — so nothing is retained indefinitely.
 - **DynamoDB** (`infrastructure/modules/dynamodb/`) — `CustomerMetadataTable`, keyed by `APP_UUID`.
-- **Lambda** (`infrastructure/modules/lambda/`) — six deployed functions. Four (unzip → write-to-dynamo → compare-faces → compare-details) are the live pipeline, sequenced by Step Functions; they run face-match (Rekognition) and ID-field extraction (Textract) checks, record results in DynamoDB, and notify via SNS. A validation/submit-license pair backs the API Gateway + SQS validation hop. A seventh, the monolithic document Lambda that did all of the above in one handler, is **commented out** — superseded by the pipeline, source retained.
+- **Lambda** (`infrastructure/modules/lambda/`) — seven deployed functions. Four (unzip → write-to-dynamo → compare-faces → compare-details) are the live pipeline, sequenced by Step Functions; they run face-match (Rekognition) and ID-field extraction (Textract) checks, record results in DynamoDB, and notify via SNS. A validation/submit-license pair backs the API Gateway + SQS validation hop. The seventh, the app API Lambda, is the only one outside the pipeline — it serves the browser's `/api/*` routes above. An eighth, the monolithic document Lambda that did the whole pipeline in one handler, is **commented out** — superseded by the pipeline, source retained.
 - **Step Functions** (`infrastructure/modules/stepFunction/`) — `DocumentStateMachine`, plus the S3 → EventBridge → Step Functions chain that starts an execution on every `zipped/` upload. X-Ray tracing is enabled end to end; `WriteToDynamoLambdaFunction` is additionally instrumented with AWS Lambda Powertools, so its S3 and DynamoDB calls show as individual subsegments (CloudWatch → Application Signals → Traces).
 - **SNS** (`infrastructure/modules/sns/`) — `ApplicationNotifications` topic with email subscription.
 - **API Gateway** (`infrastructure/modules/apiGateway/`) — `ValidateLicenseApi`, one HTTP API serving two audiences: internal `POST /license` (IAM-signed, not browser-facing) and the browser-facing `POST /api/upload-url` + `GET /api/status/{uuid}` (Cognito JWT-authorized).
@@ -104,7 +104,7 @@ One manual step after `apply` finishes: **confirm the SNS email subscription.** 
 │   │   │   ├── variables.tf
 │   │   │   ├── outputs.tf
 │   │   │   └── README.md
-│   │   ├── lambda/            # IAM (roles + inline + managed), 8 Lambda functions, log groups, SQS trigger
+│   │   ├── lambda/            # IAM (roles + inline + managed), 8 function files (7 deployed, 1 commented out), log groups, SQS trigger
 │   │   │   ├── lambda_policies.tf              # roles, inline + managed policies, attachments, log groups
 │   │   │   ├── document_lambda_function.tf     # monolithic document function — entirely commented out
 │   │   │   ├── validate_lambda_function.tf     # validation function + archive_file
@@ -113,7 +113,7 @@ One manual step after `apply` finishes: **confirm the SNS email subscription.** 
 │   │   │   ├── write_to_dynamo_lambda_function.tf # write-to-dynamo function + archive_file (invoked by the state machine)
 │   │   │   ├── compare_faces_lambda_function.tf   # compare-faces function + archive_file (invoked by the state machine)
 │   │   │   ├── compare_details_lambda_function.tf # compare-details function + archive_file (invoked by the state machine)
-│   │   │   ├── app_api_lambda_function.tf      # browser-facing app API function + archive_file (no trigger yet — see modules/lambda/README.md)
+│   │   │   ├── app_api_lambda_function.tf      # browser-facing app API function + archive_file (invoked by the /api/* routes)
 │   │   │   ├── src/                            # Python handlers (s3_upload.py, validate_lambda.py, submit_license.py, unzip_lambda.py, write_to_dynamo_lambda.py, compare_faces_lambda.py, compare_details_lambda.py, app_api_lambda.py)
 │   │   │   ├── build/                      # archive_file zip output (gitignored)
 │   │   │   ├── variables.tf
