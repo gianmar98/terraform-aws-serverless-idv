@@ -193,29 +193,29 @@ export function LoginForm({
                   {/* border-line is fine here (a decorative panel edge and row dividers) but
                       never on a control — it's 1.53:1 on paper and fails WCAG 1.4.11. The
                       trigger above uses border-ink/50 for exactly that reason. */}
-                  <div className="flex flex-col overflow-hidden rounded-md border border-line">
-                    {Object.entries(DEMO_LOGIN).map(([field, value]) => (
-                      <button
-                        key={field}
-                        type="button"
-                        onClick={() => copyField(field, value)}
-                        aria-label={`Copy demo ${field}`} // visible text is the value, not the action
-                        className={
-                          "flex items-center justify-between gap-3 border-b border-line/70 px-2.5 py-1.5 " +
-                          "text-left transition-colors duration-200 last:border-b-0 hover:bg-thread/[0.06]"
-                        }
-                      >
-                        <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink/65">
-                          {field}
-                        </span>
-                        {/* Swapping the value for "copied" keeps the confirmation off colour
-                            alone (WCAG 1.4.1) — a green tick would say it twice in one channel. */}
-                        <span className="font-mono text-[12px] text-ink">
-                          {copiedField === field ? "copied" : value}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
+                  {/*<div className="flex flex-col overflow-hidden rounded-md border border-line">*/}
+                  {/*  {Object.entries(DEMO_LOGIN).map(([field, value]) => (*/}
+                  {/*    <button*/}
+                  {/*      key={field}*/}
+                  {/*      type="button"*/}
+                  {/*      onClick={() => copyField(field, value)}*/}
+                  {/*      aria-label={`Copy demo ${field}`} // visible text is the value, not the action*/}
+                  {/*      className={*/}
+                  {/*        "flex items-center justify-between gap-3 border-b border-line/70 px-2.5 py-1.5 " +*/}
+                  {/*        "text-left transition-colors duration-200 last:border-b-0 hover:bg-thread/[0.06]"*/}
+                  {/*      }*/}
+                  {/*    >*/}
+                  {/*      <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-ink/65">*/}
+                  {/*        {field}*/}
+                  {/*      </span>*/}
+                  {/*      /!* Swapping the value for "copied" keeps the confirmation off colour*/}
+                  {/*          alone (WCAG 1.4.1) — a green tick would say it twice in one channel. *!/*/}
+                  {/*      <span className="font-mono text-[12px] text-ink">*/}
+                  {/*        {copiedField === field ? "copied" : value}*/}
+                  {/*      </span>*/}
+                  {/*    </button>*/}
+                  {/*  ))}*/}
+                  {/*</div>*/}
                 </PopoverContent>
               </Popover>
               {/* The Apple/Google/Meta buttons and their "Or continue with" separator that
